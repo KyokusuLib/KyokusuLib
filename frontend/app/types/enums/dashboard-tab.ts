@@ -1,5 +1,5 @@
 export enum DashboardTab {
-	Moderation = "moderation",
-  Parser = "parser",
-	Users = "users",
-};
+  Moderation = 'moderation',
+  Parser = 'parser',
+  Users = 'users',
+}

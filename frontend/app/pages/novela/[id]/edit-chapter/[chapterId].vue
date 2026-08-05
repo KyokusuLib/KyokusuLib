@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { useNovela } from "~/composables/api/novela/useNovela";
-import { $api } from "~/composables/api/useApi";
-import { parseChapterContent, buildChapterContent } from "~/utils/chapterContent";
-import { uid } from "~/utils/chapter";
-import ChapterEditorForm from "~/components/app/novela/ChapterEditorForm.vue";
-import type { ChapterReaderResponse } from "~/types/backend/novela";
-import type { UploadedImage } from "~/composables/ui/useImageUpload";
+import { useNovela } from '~/composables/api/novela/useNovela'
+import { $api } from '~/composables/api/useApi'
+import { parseChapterContent, buildChapterContent } from '~/utils/chapterContent'
+import { uid } from '~/utils/chapter'
+import ChapterEditorForm from '~/components/app/novela/ChapterEditorForm.vue'
+import type { ChapterReaderResponse } from '~/types/backend/novela'
+import type { UploadedImage } from '~/composables/ui/useImageUpload'
 
-const route = useRoute();
-const router = useRouter();
-const novelaId = route.params.id as string;
-const chapterId = route.params.chapterId as string;
+const route = useRoute()
+const router = useRouter()
+const novelaId = route.params.id as string
+const chapterId = route.params.chapterId as string
 
-const { novela, fetchNovela, updateChapter, deleteChapterImages, addChapterImage } = useNovela();
+const { novela, fetchNovela, updateChapter, deleteChapterImages, addChapterImage } = useNovela()
 
-await useAsyncData(`novela-edit-chapter-${novelaId}`, () => fetchNovela(novelaId));
+await useAsyncData(`novela-edit-chapter-${novelaId}`, () => fetchNovela(novelaId))
 
 const { data: chapterData } = await useAsyncData(`chapter-${chapterId}`, () =>
   $api<ChapterReaderResponse>(`/api/novela/chapters/${chapterId}`),
-);
+)
 
-const chapter = chapterData.value;
-const parsed = chapter ? parseChapterContent(chapter.content) : null;
+const chapter = chapterData.value
+const parsed = chapter ? parseChapterContent(chapter.content) : null
 
 // Convert gallery images (chapter.images) into editor blocks + UploadedImage[]
-let galleryBlocks = null;
-let galleryImages: UploadedImage[] | null = null;
+let galleryBlocks = null
+let galleryImages: UploadedImage[] | null = null
 if (chapter?.images?.length) {
   galleryImages = chapter.images.map((img) => ({
     id: `gallery-${img.id}`,
@@ -33,12 +33,12 @@ if (chapter?.images?.length) {
     previewUrl: img.image_url,
     caption: img.caption,
     isGallery: true,
-  }));
+  }))
   galleryBlocks = galleryImages.map((gImg) => ({
-    id: uid("block"),
-    type: "image" as const,
+    id: uid('block'),
+    type: 'image' as const,
     content: gImg.id,
-  }));
+  }))
 }
 
 // Combine parsed inline blocks + gallery blocks
@@ -46,78 +46,80 @@ const combinedBlocks = parsed
   ? galleryBlocks
     ? [...parsed.blocks, ...galleryBlocks]
     : parsed.blocks
-  : null;
+  : null
 const combinedImages = parsed
   ? galleryImages
     ? [...parsed.images, ...galleryImages]
     : parsed.images
-  : null;
+  : null
 
-const selectedVolumeId = ref(chapter?.volume_id ?? "");
-const chapterNumber = ref(chapter?.number ?? 1);
-const chapterTitle = ref(chapter?.title ?? "");
+const selectedVolumeId = ref(chapter?.volume_id ?? '')
+const chapterNumber = ref(chapter?.number ?? 1)
+const chapterTitle = ref(chapter?.title ?? '')
 
 const volumes = computed(() =>
   (novela.value?.volumes ?? []).map((v) => ({
     value: v.id,
-    label: `Том ${v.number}${v.title ? ` — ${v.title}` : ""}`,
+    label: `Том ${v.number}${v.title ? ` — ${v.title}` : ''}`,
   })),
-);
+)
 
-const isSubmitting = ref(false);
-const formRef = ref();
+const isSubmitting = ref(false)
+const formRef = ref()
 
 async function onSubmit(_content: string) {
-  isSubmitting.value = true;
+  isSubmitting.value = true
   try {
-    const form = (formRef.value as any)?.form;
-    if (!form) return;
+    const form = (formRef.value as any)?.form
+    if (!form) return
 
-    const allBlocks = form.blocks;
-    const allImages = form.images;
+    const allBlocks = form.blocks
+    const allImages = form.images
 
     // Separate gallery vs inline
-    const inlineImages = allImages.filter((img) => !img.isGallery);
-    const galleryImgs: UploadedImage[] = [];
+    const inlineImages = allImages.filter((img) => !img.isGallery)
+    const galleryImgs: UploadedImage[] = []
 
     // Collect gallery images in block order (not image array order)
     for (const block of allBlocks) {
-      if (block.type === "image") {
-        const img = allImages.find((i) => i.id === block.content);
-        if (img?.isGallery) galleryImgs.push(img);
+      if (block.type === 'image') {
+        const img = allImages.find((i) => i.id === block.content)
+        if (img?.isGallery) galleryImgs.push(img)
       }
     }
 
     // Build content from inline blocks only (gallery blocks → "" → filter(Boolean) removes them)
-    const content = buildChapterContent(allBlocks, inlineImages);
+    const content = buildChapterContent(allBlocks, inlineImages)
 
     // Save chapter content (inline only)
     await updateChapter(
-      Number(novelaId), chapterId,
+      Number(novelaId),
+      chapterId,
       chapterNumber.value,
       chapterTitle.value || `Глава ${chapterNumber.value}`,
       content,
-    );
+    )
 
     // Save gallery images separately: delete old, re-create
     if (galleryImgs.length > 0) {
-      await deleteChapterImages(chapterId);
+      await deleteChapterImages(chapterId)
       await Promise.all(
-        galleryImgs.map((img, i) =>
-          addChapterImage(chapterId, img.sourceUrl, img.caption, i),
-        ),
-      );
+        galleryImgs.map((img, i) => addChapterImage(chapterId, img.sourceUrl, img.caption, i)),
+      )
     }
 
-    router.push(`/novela/${novelaId}`);
+    router.push(`/novela/${novelaId}`)
   } finally {
-    isSubmitting.value = false;
+    isSubmitting.value = false
   }
 }
 </script>
 
 <template>
-  <div v-if="!chapter" class="flex flex-col items-center justify-center min-h-screen gap-4 text-zinc-500">
+  <div
+    v-if="!chapter"
+    class="flex flex-col items-center justify-center min-h-screen gap-4 text-zinc-500"
+  >
     <Icon name="ph:warning-circle-bold" size="48" />
     <p>Глава не найдена</p>
     <button

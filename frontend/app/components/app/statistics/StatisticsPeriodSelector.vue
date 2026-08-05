@@ -27,7 +27,7 @@ const periods = [
       :class="[
         modelValue === period.value
           ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-600'
-          : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+          : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800',
       ]"
       @click="emit('update:modelValue', period.value)"
     >

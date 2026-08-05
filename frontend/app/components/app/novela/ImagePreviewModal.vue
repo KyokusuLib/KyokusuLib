@@ -1,25 +1,25 @@
 <script setup lang="ts">
 const props = defineProps<{
-  imageUrl: string;
-}>();
+  imageUrl: string
+}>()
 
 const emit = defineEmits<{
-  close: [];
-}>();
+  close: []
+}>()
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") emit("close");
+  if (e.key === 'Escape') emit('close')
 }
 
 onMounted(() => {
-  document.addEventListener("keydown", onKeydown);
-  document.body.style.overflow = "hidden";
-});
+  document.addEventListener('keydown', onKeydown)
+  document.body.style.overflow = 'hidden'
+})
 
 onBeforeUnmount(() => {
-  document.removeEventListener("keydown", onKeydown);
-  document.body.style.overflow = "";
-});
+  document.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
+})
 </script>
 
 <template>

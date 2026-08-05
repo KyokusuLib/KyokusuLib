@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useAuthStore } from "~/stores/auth";
-const authStore = useAuthStore();
+import { useAuthStore } from '~/stores/auth'
+const authStore = useAuthStore()
 
 if (authStore.user?.id) {
-	await navigateTo(`/profile/${authStore.user.id}`, { replace: true });
+  await navigateTo(`/profile/${authStore.user.id}`, { replace: true })
 } else {
-	await navigateTo("/login");
+  await navigateTo('/login')
 }
 </script>
 

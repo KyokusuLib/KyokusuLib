@@ -13,7 +13,16 @@ import {
   Filler,
 } from 'chart.js'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+)
 
 interface Dataset {
   label: string
@@ -32,10 +41,10 @@ const props = defineProps<{
 }>()
 
 const chartData = computed(() => ({
-  labels: props.data.map(d => d.label),
+  labels: props.data.map((d) => d.label),
   datasets: props.datasets.map((ds, i) => ({
     label: ds.label,
-    data: props.data.map(d => d.values[i] ?? 0),
+    data: props.data.map((d) => d.values[i] ?? 0),
     borderColor: ds.color,
     backgroundColor: ds.color + '15',
     fill: true,

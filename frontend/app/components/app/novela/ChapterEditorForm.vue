@@ -1,67 +1,73 @@
 <script setup lang="ts">
-import type { ChapterBlock } from "~/stores/chapterDraft";
-import type { UploadedImage } from "~/composables/ui/useImageUpload";
-import { useChapterForm } from "~/composables/ui/useChapterForm";
-import { staticImage } from "~/utils/str";
-import { Select as BaseSelect } from "@kyokusu-ui/vue";
-import ChapterEditorBlock from "~/components/app/novela/ChapterEditorBlock.vue";
-import ChapterEditorImageBlock from "~/components/app/novela/ChapterEditorImageBlock.vue";
-import ImagePreviewModal from "~/components/app/novela/ImagePreviewModal.vue";
+import type { ChapterBlock } from '~/stores/chapterDraft'
+import type { UploadedImage } from '~/composables/ui/useImageUpload'
+import { useChapterForm } from '~/composables/ui/useChapterForm'
+import { staticImage } from '~/utils/str'
+import { Select as BaseSelect } from '@kyokusu-ui/vue'
+import ChapterEditorBlock from '~/components/app/novela/ChapterEditorBlock.vue'
+import ChapterEditorImageBlock from '~/components/app/novela/ChapterEditorImageBlock.vue'
+import ImagePreviewModal from '~/components/app/novela/ImagePreviewModal.vue'
 
 const props = defineProps<{
-  volumes: { value: string; label: string }[];
-  selectedVolumeId: string;
-  chapterNumber: number;
-  chapterTitle: string;
-  posterUrl?: string;
-  title: string;
-  subtitle: string;
-  submitLabel: string;
-  submittingLabel: string;
-  isSubmitting: boolean;
+  volumes: { value: string; label: string }[]
+  selectedVolumeId: string
+  chapterNumber: number
+  chapterTitle: string
+  posterUrl?: string
+  title: string
+  subtitle: string
+  submitLabel: string
+  submittingLabel: string
+  isSubmitting: boolean
   // Pre‑populate form for edit mode
-  initialBlocks?: ChapterBlock[];
-  initialImages?: UploadedImage[];
-}>();
+  initialBlocks?: ChapterBlock[]
+  initialImages?: UploadedImage[]
+}>()
 
 const emit = defineEmits<{
-  "update:selectedVolumeId": [v: string];
-  "update:chapterNumber": [v: number];
-  "update:chapterTitle": [v: string];
-  submit: [content: string];
-}>();
+  'update:selectedVolumeId': [v: string]
+  'update:chapterNumber': [v: number]
+  'update:chapterTitle': [v: string]
+  submit: [content: string]
+}>()
 
-const form = reactive(useChapterForm({ blocks: props.initialBlocks, images: props.initialImages }));
-const { previewImageUrl } = form;
+const form = reactive(useChapterForm({ blocks: props.initialBlocks, images: props.initialImages }))
+const { previewImageUrl } = form
 
-const chapterNumberError = ref("");
+const chapterNumberError = ref('')
 
-defineExpose({ form });
+defineExpose({ form })
 
 function onSplitText(
   index: number,
-  { beforeHTML, selectedHTML, afterHTML }: { beforeHTML: string; selectedHTML: string; afterHTML: string },
+  {
+    beforeHTML,
+    selectedHTML,
+    afterHTML,
+  }: { beforeHTML: string; selectedHTML: string; afterHTML: string },
 ) {
-  form.blocks[index].content = beforeHTML + afterHTML;
-  form.addTextAt(index);
-  form.blocks[index + 1].content = selectedHTML;
+  form.blocks[index].content = beforeHTML + afterHTML
+  form.addTextAt(index)
+  form.blocks[index + 1].content = selectedHTML
 }
 
 function onChapterNumberInput(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const val = input.value;
-  const num = Number(val);
-  if (val === "" || (Number.isInteger(num) && num >= 1)) {
-    emit("update:chapterNumber", num || 1);
-    chapterNumberError.value = "";
+  const input = e.target as HTMLInputElement
+  const val = input.value
+  const num = Number(val)
+  if (val === '' || (Number.isInteger(num) && num >= 1)) {
+    emit('update:chapterNumber', num || 1)
+    chapterNumberError.value = ''
   } else {
-    chapterNumberError.value = "Номер главы должен быть целым числом";
+    chapterNumberError.value = 'Номер главы должен быть целым числом'
   }
 }
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 dark:bg-[#0f0f0f] text-zinc-900 dark:text-zinc-200 relative overflow-hidden">
+  <div
+    class="min-h-screen bg-zinc-50 dark:bg-[#0f0f0f] text-zinc-900 dark:text-zinc-200 relative overflow-hidden"
+  >
     <div class="absolute inset-0 z-0 pointer-events-none">
       <div v-if="posterUrl" class="absolute inset-0">
         <img
@@ -86,14 +92,18 @@ function onChapterNumberInput(e: Event) {
       </div>
 
       <form class="space-y-6" @submit.prevent="emit('submit', form.getContent())">
-        <div class="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5 shadow-xl shadow-zinc-200/50 dark:shadow-none">
+        <div
+          class="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5 shadow-xl shadow-zinc-200/50 dark:shadow-none"
+        >
           <div class="flex items-center gap-2 mb-2">
             <Icon name="ph:info-bold" size="18" class="text-zinc-400" />
             <h2 class="text-lg font-bold">Основная информация</h2>
           </div>
 
           <div>
-            <label class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+            <label
+              class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+            >
               <Icon name="ph:books-bold" size="16" class="text-zinc-400" />
               Том
             </label>
@@ -107,7 +117,9 @@ function onChapterNumberInput(e: Event) {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              <label
+                class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+              >
                 <Icon name="ph:hash-bold" size="16" class="text-zinc-400" />
                 Номер главы
               </label>
@@ -121,10 +133,14 @@ function onChapterNumberInput(e: Event) {
                 :class="chapterNumberError ? 'border-red-400 dark:border-red-600' : ''"
                 @input="onChapterNumberInput"
               />
-              <p v-if="chapterNumberError" class="text-xs text-red-500 mt-1">{{ chapterNumberError }}</p>
+              <p v-if="chapterNumberError" class="text-xs text-red-500 mt-1">
+                {{ chapterNumberError }}
+              </p>
             </div>
             <div>
-              <label class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              <label
+                class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+              >
                 <Icon name="ph:text-t-bold" size="16" class="text-zinc-400" />
                 Название
               </label>
@@ -139,7 +155,9 @@ function onChapterNumberInput(e: Event) {
           </div>
         </div>
 
-        <div class="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl shadow-zinc-200/50 dark:shadow-none">
+        <div
+          class="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl shadow-zinc-200/50 dark:shadow-none"
+        >
           <div class="flex items-center justify-between mb-4">
             <h2 class="flex items-center gap-2 text-lg font-bold">
               <Icon name="ph:list-bullets-bold" size="20" class="text-zinc-400" />
@@ -170,7 +188,11 @@ function onChapterNumberInput(e: Event) {
               <div
                 @dragover="form.onDragOver($event, index)"
                 @drop.prevent="form.onDrop(index)"
-                :class="form.hoverIndex === index && form.hoverIndex !== form.dragIndex ? 'ring-2 ring-yellow-400/60 rounded-xl' : ''"
+                :class="
+                  form.hoverIndex === index && form.hoverIndex !== form.dragIndex
+                    ? 'ring-2 ring-yellow-400/60 rounded-xl'
+                    : ''
+                "
               >
                 <ChapterEditorBlock
                   v-if="block.type === 'text'"
@@ -205,7 +227,8 @@ function onChapterNumberInput(e: Event) {
 
           <p class="flex items-center gap-2 text-xs text-zinc-400 mt-3">
             <Icon name="ph:info-bold" size="14" />
-            Перетаскивайте блоки за иконку слева для изменения порядка. Позиция изображения определяется порядком блока.
+            Перетаскивайте блоки за иконку слева для изменения порядка. Позиция изображения
+            определяется порядком блока.
           </p>
         </div>
 

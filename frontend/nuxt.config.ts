@@ -1,78 +1,73 @@
-import tailwindcss from "@tailwindcss/vite";
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-	app: {
-		head: {
-			title: "KyokusuLib",
-			charset: "utf-8",
-			viewport: "width=device-width, initial-scale=1",
-			link: [
-				{ rel: "icon", type: "image/svg+xml", href: "/images/KLibIcon.svg" },
-			],
-		},
-	},
-	devtools: { enabled: true },
+  app: {
+    head: {
+      title: 'KyokusuLib',
+      charset: 'utf-8',
+      viewport: 'width=device-width, initial-scale=1',
+      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/images/KLibIcon.svg' }],
+    },
+  },
+  devtools: { enabled: true },
 
-	modules: ["@pinia/nuxt", "@vueuse/nuxt", "@nuxtjs/color-mode", "@nuxt/icon"],
+  modules: ['@pinia/nuxt', '@vueuse/nuxt', '@nuxtjs/color-mode', '@nuxt/icon'],
 
   routeRules: {
-    "/api/**": { 
-      proxy: (process.env.NUXT_API_INTERNAL_URL || "http://localhost:8080") + "/api/**" 
+    '/api/**': {
+      proxy: (process.env.NUXT_API_INTERNAL_URL || 'http://localhost:8080') + '/api/**',
     },
-    "/uploads/**": {
-      proxy: (process.env.NUXT_API_INTERNAL_URL || "http://localhost:8080") + "/uploads/**"
+    '/uploads/**': {
+      proxy: (process.env.NUXT_API_INTERNAL_URL || 'http://localhost:8080') + '/uploads/**',
     },
   },
 
-	colorMode: {
-		preference: "dark",
-		fallback: "dark",
-		classSuffix: "",
-		storageKey: "theme",
-	},
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark',
+    classSuffix: '',
+    storageKey: 'theme',
+  },
 
-	icon: {
-		clientBundle: {
-			scan: true,
-			includeCustomCollections: true,
-		},
-		serverBundle: "local",
-	},
+  icon: {
+    clientBundle: {
+      scan: true,
+      includeCustomCollections: true,
+    },
+    serverBundle: 'local',
+  },
 
-	vite: {
+  vite: {
     plugins: [tailwindcss()],
     optimizeDeps: {
-      include: [
-        "@vue/devtools-core",
-        "@vue/devtools-kit",
-      ],
+      include: ['@vue/devtools-core', '@vue/devtools-kit'],
     },
-		resolve: {
-			dedupe: ["vue"],
-		},
-	},
+    resolve: {
+      dedupe: ['vue'],
+    },
+  },
 
-	build: {
-		transpile: ["@kyokusu-ui/vue"],
-	},
+  build: {
+    transpile: ['@kyokusu-ui/vue'],
+  },
 
-	css: ["~/assets/css/global.css"],
+  css: ['~/assets/css/global.css'],
 
-	postcss: {
-		plugins: {
-			autoprefixer: {},
-		},
-	},
+  postcss: {
+    plugins: {
+      autoprefixer: {},
+    },
+  },
 
-	sourcemap: {
-		client: "hidden",
-	},
+  sourcemap: {
+    client: 'hidden',
+  },
 
-	runtimeConfig: {
-		public: {
-			apiBase: process.env.NUXT_PUBLIC_API_BASE || "",
-		},
-	},
+  runtimeConfig: {
+    public: {
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || '',
+    },
+  },
 
-	compatibilityDate: "latest",
-});
+  compatibilityDate: 'latest',
+})

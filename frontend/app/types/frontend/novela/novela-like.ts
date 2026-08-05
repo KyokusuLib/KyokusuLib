@@ -1,4 +1,4 @@
 export interface NovelaLikeRequest {
-	novela_id: number;
-	has_liked: boolean;
+  novela_id: number
+  has_liked: boolean
 }

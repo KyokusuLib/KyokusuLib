@@ -1,56 +1,60 @@
 <script setup lang="ts">
-import { Tooltip } from "@kyokusu-ui/vue";
+import { Tooltip } from '@kyokusu-ui/vue'
 
 defineProps<{
-  canRemove: boolean;
-  previewUrl?: string;
-  caption: string;
-  position: number;
-}>();
+  canRemove: boolean
+  previewUrl?: string
+  caption: string
+  position: number
+}>()
 
 const emit = defineEmits<{
-  "update:caption": [value: string];
-  fileSelected: [file: File];
-  remove: [];
-  addTextAfter: [];
-  addImageAfter: [];
-  dragStart: [];
-  dragEnd: [];
-  previewImage: [url: string];
-}>();
+  'update:caption': [value: string]
+  fileSelected: [file: File]
+  remove: []
+  addTextAfter: []
+  addImageAfter: []
+  dragStart: []
+  dragEnd: []
+  previewImage: [url: string]
+}>()
 
-const fileInput = ref<HTMLInputElement | null>(null);
-const isDragOver = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null)
+const isDragOver = ref(false)
 
 function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (file) emit("fileSelected", file);
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) emit('fileSelected', file)
 }
 
 function onDrop(e: DragEvent) {
-  e.preventDefault();
-  isDragOver.value = false;
-  const file = e.dataTransfer?.files?.[0];
-  if (file && file.type.startsWith("image/")) {
-    emit("fileSelected", file);
+  e.preventDefault()
+  isDragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    emit('fileSelected', file)
   }
 }
 
 function onDragOver(e: DragEvent) {
-  e.preventDefault();
-  isDragOver.value = true;
+  e.preventDefault()
+  isDragOver.value = true
 }
 
 function onDragLeave() {
-  isDragOver.value = false;
+  isDragOver.value = false
 }
 </script>
 
 <template>
   <div
     class="group relative rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors"
-    :class="isDragOver ? 'border-yellow-400 dark:border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20' : ''"
+    :class="
+      isDragOver
+        ? 'border-yellow-400 dark:border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20'
+        : ''
+    "
     @drop="onDrop"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
@@ -69,20 +73,12 @@ function onDragLeave() {
       </span>
       <div class="ml-auto flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
         <Tooltip text="Добавить текстовый блок ниже">
-          <button
-            type="button"
-            class="rounded-md cursor-pointer"
-            @click="emit('addTextAfter')"
-          >
+          <button type="button" class="rounded-md cursor-pointer" @click="emit('addTextAfter')">
             <Icon name="ph:text-t-bold" size="14" class="text-zinc-500" />
           </button>
         </Tooltip>
         <Tooltip text="Добавить изображение ниже">
-          <button
-            type="button"
-            class="rounded-md cursor-pointer"
-            @click="emit('addImageAfter')"
-          >
+          <button type="button" class="rounded-md cursor-pointer" @click="emit('addImageAfter')">
             <Icon name="ph:image-bold" size="14" class="text-zinc-500" />
           </button>
         </Tooltip>
@@ -108,13 +104,7 @@ function onDragLeave() {
         <p class="text-sm text-zinc-500 text-center">
           Перетащите изображение сюда<br />или нажмите для выбора
         </p>
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/*"
-          class="hidden"
-          @change="onFileChange"
-        />
+        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange" />
       </div>
 
       <template v-else>

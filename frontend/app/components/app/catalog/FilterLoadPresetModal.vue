@@ -1,68 +1,68 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { ModalWindow, Button } from '@kyokusu-ui/vue';
-import ModalConfirm from '~/components/common/ModalConfirm.vue';
-import type { CatalogFilterPreset } from '~/types/backend/catalog-filters';
+import { computed } from 'vue'
+import { ModalWindow, Button } from '@kyokusu-ui/vue'
+import ModalConfirm from '~/components/common/ModalConfirm.vue'
+import type { CatalogFilterPreset } from '~/types/backend/catalog-filters'
 
 const props = defineProps<{
-  modelValue: boolean;
-  presets: CatalogFilterPreset[];
-}>();
+  modelValue: boolean
+  presets: CatalogFilterPreset[]
+}>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
-  close: [];
-  load: [preset: CatalogFilterPreset];
-  delete: [id: number];
-}>();
+  'update:modelValue': [value: boolean]
+  close: []
+  load: [preset: CatalogFilterPreset]
+  delete: [id: number]
+}>()
 
 const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
-});
+})
 
-const deletingPresetId = ref<number | null>(null);
-const deletingPresetName = ref('');
+const deletingPresetId = ref<number | null>(null)
+const deletingPresetName = ref('')
 
-const deleteConfirmVisible = computed(() => deletingPresetId.value !== null);
+const deleteConfirmVisible = computed(() => deletingPresetId.value !== null)
 
 function onClose() {
-  emit('update:modelValue', false);
-  emit('close');
+  emit('update:modelValue', false)
+  emit('close')
 }
 
 function onLoad(preset: CatalogFilterPreset) {
-  emit('load', preset);
-  onClose();
+  emit('load', preset)
+  onClose()
 }
 
 function confirmDelete(preset: CatalogFilterPreset) {
-  deletingPresetId.value = preset.id;
-  deletingPresetName.value = preset.name;
+  deletingPresetId.value = preset.id
+  deletingPresetName.value = preset.name
 }
 
 function onDeleteConfirmed() {
   if (deletingPresetId.value !== null) {
-    emit('delete', deletingPresetId.value);
+    emit('delete', deletingPresetId.value)
   }
-  deletingPresetId.value = null;
-  deletingPresetName.value = '';
+  deletingPresetId.value = null
+  deletingPresetName.value = ''
 }
 
 function onDeleteCancelled() {
-  deletingPresetId.value = null;
-  deletingPresetName.value = '';
+  deletingPresetId.value = null
+  deletingPresetName.value = ''
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr)
   return d.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  })
 }
 </script>
 

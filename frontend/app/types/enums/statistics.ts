@@ -1,5 +1,5 @@
 export enum StatisticsPeriodEnum {
-  Day = "day",
-  Week = "week",
-  Month = "month",
+  Day = 'day',
+  Week = 'week',
+  Month = 'month',
 }

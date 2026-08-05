@@ -1,300 +1,252 @@
-import { $api } from "@/composables/api/useApi";
-import type { NovelaChapter, NovelaDetails } from "@/types/backend/novela";
-import { useAuthStore } from "@/stores/auth";
-import { ref, watch, nextTick } from "vue";
-import { useThrottleFn, useEventListener } from "@vueuse/core";
-import type { UserLevel } from "~/types/backend/user";
+import { $api } from '@/composables/api/useApi'
+import type { NovelaChapter, NovelaDetails } from '@/types/backend/novela'
+import { useAuthStore } from '@/stores/auth'
+import { ref, watch, nextTick } from 'vue'
+import { useThrottleFn, useEventListener } from '@vueuse/core'
+import type { UserLevel } from '~/types/backend/user'
 
 export function useReadProgress() {
-  const { isAuthenticated, user } = useAuthStore();
-	const { notify } = useNotificationStore();
+  const { isAuthenticated, user } = useAuthStore()
+  const { notify } = useNotificationStore()
 
-	function isChapterRead(chapter: NovelaChapter): boolean {
-		return chapter.is_read ?? false;
-	}
+  function isChapterRead(chapter: NovelaChapter): boolean {
+    return chapter.is_read ?? false
+  }
 
-	function getLastReadChapterId(novela: NovelaDetails): string | null {
-		return novela.last_readed?.chapter_id ?? null;
-	}
+  function getLastReadChapterId(novela: NovelaDetails): string | null {
+    return novela.last_readed?.chapter_id ?? null
+  }
 
-	function getLastReadChapterNumber(novela: NovelaDetails): number | null {
-		return novela.last_readed?.chapter_number ?? null;
-	}
+  function getLastReadChapterNumber(novela: NovelaDetails): number | null {
+    return novela.last_readed?.chapter_number ?? null
+  }
 
-	function getLastReadChapterScroll(novela: NovelaDetails): number | null {
-    return novela.last_readed?.chapter_scroll ?? null;
-	}
+  function getLastReadChapterScroll(novela: NovelaDetails): number | null {
+    return novela.last_readed?.chapter_scroll ?? null
+  }
 
-	function getFirstChapterId(novela: NovelaDetails): string | null {
-		const firstVolume = novela.volumes?.[0];
+  function getFirstChapterId(novela: NovelaDetails): string | null {
+    const firstVolume = novela.volumes?.[0]
 
-		if (!firstVolume?.chapters?.length) {
-			return null;
-		}
+    if (!firstVolume?.chapters?.length) {
+      return null
+    }
 
-		return firstVolume.chapters[0]!.id;
-	}
+    return firstVolume.chapters[0]!.id
+  }
 
-	function getContinueReadingUrl(novela: NovelaDetails): string | null {
-		if (!isAuthenticated) {
-			const firstId = getFirstChapterId(novela);
+  function getContinueReadingUrl(novela: NovelaDetails): string | null {
+    if (!isAuthenticated) {
+      const firstId = getFirstChapterId(novela)
 
-			return firstId
-				? `/novela/reader/${novela.id}/${firstId}`
-				: null;
-		}
+      return firstId ? `/novela/reader/${novela.id}/${firstId}` : null
+    }
 
-		const lastId = getLastReadChapterId(novela);
+    const lastId = getLastReadChapterId(novela)
 
-		if (lastId) {
-			return `/novela/reader/${novela.id}/${lastId}`;
-		}
+    if (lastId) {
+      return `/novela/reader/${novela.id}/${lastId}`
+    }
 
-		const firstId = getFirstChapterId(novela);
+    const firstId = getFirstChapterId(novela)
 
-		return firstId
-			? `/novela/reader/${novela.id}/${firstId}`
-			: null;
-	}
+    return firstId ? `/novela/reader/${novela.id}/${firstId}` : null
+  }
 
-	async function saveReadPosition(
-		chapterId: string,
-		scrollPosition: number
-	) {
-		if (!isAuthenticated) {
-			return;
-		}
+  async function saveReadPosition(chapterId: string, scrollPosition: number) {
+    if (!isAuthenticated) {
+      return
+    }
 
-		try {
-			await $api("/api/novela/chapters/progress", {
-				method: "POST",
-				body: {
-					chapter_id: chapterId,
-					scroll_position: Math.round(scrollPosition),
-				},
-			});
-		} catch (e) {
-			console.error("Failed to save read position:", e);
-		}
+    try {
+      await $api('/api/novela/chapters/progress', {
+        method: 'POST',
+        body: {
+          chapter_id: chapterId,
+          scroll_position: Math.round(scrollPosition),
+        },
+      })
+    } catch (e) {
+      console.error('Failed to save read position:', e)
+    }
   }
 
   async function markChapterAsRead(chapterId: string): Promise<boolean> {
-    let isRead = false;
-    
+    let isRead = false
+
     if (!isAuthenticated) {
-      return isRead;
+      return isRead
     }
 
     try {
       const data = await $api<UserLevel>(`/api/novela/chapter/${chapterId}/mark-as-read`, {
-        method: "POST",
-      });
+        method: 'POST',
+      })
 
       if (data !== null || data !== undefined) {
-        user!.user_level = data;
-        isRead = true;
+        user!.user_level = data
+        isRead = true
       }
     } catch (e: any) {
-      if (e instanceof Error && e.message === "Ошибка: Chapter already read") {
-        isRead = true;
-        notify({ title: "Внимание", type: "warning", content: "Награда за прочтение этой главы уже получена" });
+      if (e instanceof Error && e.message === 'Ошибка: Chapter already read') {
+        isRead = true
+        notify({
+          title: 'Внимание',
+          type: 'warning',
+          content: 'Награда за прочтение этой главы уже получена',
+        })
       } else {
-        notify({ title: "Ошибка", type: "error", content: e instanceof Error ? e.message : String(e) });
+        notify({
+          title: 'Ошибка',
+          type: 'error',
+          content: e instanceof Error ? e.message : String(e),
+        })
       }
     }
 
-    return isRead;
+    return isRead
   }
 
-	return {
-		isChapterRead,
-		getLastReadChapterId,
-		getLastReadChapterNumber,
-		getLastReadChapterScroll,
-		getFirstChapterId,
-		getContinueReadingUrl,
+  return {
+    isChapterRead,
+    getLastReadChapterId,
+    getLastReadChapterNumber,
+    getLastReadChapterScroll,
+    getFirstChapterId,
+    getContinueReadingUrl,
     saveReadPosition,
     markChapterAsRead,
-	};
+  }
 }
 
-export function useReaderScrollPosition(
-	chapterId: string,
-	initialScroll = 0
-) {
-	const { saveReadPosition } = useReadProgress();
-	const { isAuthenticated } = useAuthStore();
+export function useReaderScrollPosition(chapterId: string, initialScroll = 0) {
+  const { saveReadPosition } = useReadProgress()
+  const { isAuthenticated } = useAuthStore()
 
-	const currentChapterId = ref(chapterId);
-	const lastSavedOffset = ref(0);
+  const currentChapterId = ref(chapterId)
+  const lastSavedOffset = ref(0)
 
-	function getChapterElement(id: string) {
-		return document.querySelector<HTMLElement>(
-			`[data-chapter-id="${id}"]`
-		);
-	}
+  function getChapterElement(id: string) {
+    return document.querySelector<HTMLElement>(`[data-chapter-id="${id}"]`)
+  }
 
-	function getCurrentOffset() {
-		const chapterEl = getChapterElement(currentChapterId.value);
+  function getCurrentOffset() {
+    const chapterEl = getChapterElement(currentChapterId.value)
 
-		if (!chapterEl) {
-			return 0;
-		}
+    if (!chapterEl) {
+      return 0
+    }
 
-		const chapterTop =
-			chapterEl.getBoundingClientRect().top + window.scrollY;
+    const chapterTop = chapterEl.getBoundingClientRect().top + window.scrollY
 
-		return Math.max(
-			0,
-			Math.round(window.scrollY - chapterTop)
-		);
-	}
+    return Math.max(0, Math.round(window.scrollY - chapterTop))
+  }
 
-	const throttledSave = useThrottleFn(async () => {
-		if (!isAuthenticated) return;
+  const throttledSave = useThrottleFn(async () => {
+    if (!isAuthenticated) return
 
-		const offset = getCurrentOffset();
+    const offset = getCurrentOffset()
 
-		lastSavedOffset.value = offset;
+    lastSavedOffset.value = offset
 
-		await saveReadPosition(
-			currentChapterId.value,
-			offset
-		);
-  }, 500);
+    await saveReadPosition(currentChapterId.value, offset)
+  }, 500)
 
-	function setupScrollTracking() {
-		if (!isAuthenticated) {
-			return;
-		}
+  function setupScrollTracking() {
+    if (!isAuthenticated) {
+      return
+    }
 
-		useEventListener(
-			window,
-			"scroll",
-			throttledSave,
-			{ passive: true }
-		);
-	}
+    useEventListener(window, 'scroll', throttledSave, { passive: true })
+  }
 
-	async function restoreScroll() {
-		if (
-			Number.isNaN(initialScroll) ||
-			initialScroll < 0
-		) {
-			return;
-		}
+  async function restoreScroll() {
+    if (Number.isNaN(initialScroll) || initialScroll < 0) {
+      return
+    }
 
-		await nextTick();
+    await nextTick()
 
-		let attempts = 0;
+    let attempts = 0
 
-		const restore = () => {
-			const chapterEl = getChapterElement(
-				currentChapterId.value
-			);
+    const restore = () => {
+      const chapterEl = getChapterElement(currentChapterId.value)
 
-			if (!chapterEl) {
-				attempts++;
+      if (!chapterEl) {
+        attempts++
 
-				if (attempts < 30) {
-					setTimeout(restore, 100);
-				}
+        if (attempts < 30) {
+          setTimeout(restore, 100)
+        }
 
-				return;
-			}
+        return
+      }
 
-			const chapterTop =
-				chapterEl.getBoundingClientRect().top +
-				window.scrollY;
+      const chapterTop = chapterEl.getBoundingClientRect().top + window.scrollY
 
-			window.scrollTo({
-				top: chapterTop + initialScroll,
-				behavior: "auto",
-			});
-		};
+      window.scrollTo({
+        top: chapterTop + initialScroll,
+        behavior: 'auto',
+      })
+    }
 
-		restore();
+    restore()
 
-		const images = Array.from(
-			document.querySelectorAll("img")
-		);
+    const images = Array.from(document.querySelectorAll('img'))
 
-		await Promise.all(
-			images.map((img) => {
-				if (img.complete) {
-					return Promise.resolve();
-				}
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) {
+          return Promise.resolve()
+        }
 
-				return new Promise<void>((resolve) => {
-					img.addEventListener(
-						"load",
-						() => resolve(),
-						{ once: true }
-					);
+        return new Promise<void>((resolve) => {
+          img.addEventListener('load', () => resolve(), { once: true })
 
-					img.addEventListener(
-						"error",
-						() => resolve(),
-						{ once: true }
-					);
-				});
-			})
-		);
+          img.addEventListener('error', () => resolve(), { once: true })
+        })
+      }),
+    )
 
-		await nextTick();
+    await nextTick()
 
-		restore();
+    restore()
 
-		setTimeout(restore, 100);
-		setTimeout(restore, 300);
-		setTimeout(restore, 700);
-	}
+    setTimeout(restore, 100)
+    setTimeout(restore, 300)
+    setTimeout(restore, 700)
+  }
 
-	async function saveOnLeave() {
-		if (!isAuthenticated) {
-			return;
-		}
+  async function saveOnLeave() {
+    if (!isAuthenticated) {
+      return
+    }
 
-		await saveReadPosition(
-			currentChapterId.value,
-			getCurrentOffset()
-		);
-	}
+    await saveReadPosition(currentChapterId.value, getCurrentOffset())
+  }
 
-	watch(currentChapterId, async (newId, oldId) => {
-		if (
-			!isAuthenticated ||
-			!oldId ||
-			oldId === newId
-		) {
-			return;
-		}
+  watch(currentChapterId, async (newId, oldId) => {
+    if (!isAuthenticated || !oldId || oldId === newId) {
+      return
+    }
 
-		const oldChapterEl = getChapterElement(oldId);
+    const oldChapterEl = getChapterElement(oldId)
 
-		if (oldChapterEl) {
-			const chapterTop =
-				oldChapterEl.getBoundingClientRect().top +
-				window.scrollY;
+    if (oldChapterEl) {
+      const chapterTop = oldChapterEl.getBoundingClientRect().top + window.scrollY
 
-			const offset = Math.max(
-				0,
-				Math.round(window.scrollY - chapterTop)
-			);
+      const offset = Math.max(0, Math.round(window.scrollY - chapterTop))
 
-			await saveReadPosition(
-				oldId,
-				offset
-			);
-		}
+      await saveReadPosition(oldId, offset)
+    }
 
-		lastSavedOffset.value = 0;
-	});
+    lastSavedOffset.value = 0
+  })
 
-	return {
-		currentChapterId,
-		setupScrollTracking,
-		restoreScroll,
-		saveOnLeave,
-	};
+  return {
+    currentChapterId,
+    setupScrollTracking,
+    restoreScroll,
+    saveOnLeave,
+  }
 }

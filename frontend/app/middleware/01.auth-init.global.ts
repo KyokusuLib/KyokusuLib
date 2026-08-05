@@ -1,15 +1,15 @@
-import { useAuthStore } from "~/stores/auth";
+import { useAuthStore } from '~/stores/auth'
 
 export default defineNuxtRouteMiddleware(async (_to, _from) => {
-	const authStore = useAuthStore();
+  const authStore = useAuthStore()
 
-	const token = useCookie("KYOKUSU_API_TOKEN");
+  const token = useCookie('KYOKUSU_API_TOKEN')
 
-	if (token.value && !authStore.isAuthenticated) {
-		try {
-			await authStore.initAuth();
-		} catch (_e) {
-			token.value = null;
-		}
-	}
-});
+  if (token.value && !authStore.isAuthenticated) {
+    try {
+      await authStore.initAuth()
+    } catch (_e) {
+      token.value = null
+    }
+  }
+})

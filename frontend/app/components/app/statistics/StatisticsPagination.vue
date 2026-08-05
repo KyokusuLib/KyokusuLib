@@ -41,9 +41,7 @@ const emit = defineEmits<{
         Страница: {{ currentPage }}
       </span>
       <Separator orientation="vertical" />
-      <span class="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-        Всего: {{ total }}
-      </span>
+      <span class="text-sm font-medium text-zinc-500 dark:text-zinc-400"> Всего: {{ total }} </span>
     </div>
   </div>
 </template>

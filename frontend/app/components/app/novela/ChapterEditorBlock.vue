@@ -1,97 +1,97 @@
 <script setup lang="ts">
-import { RichText as BaseRichTextEditor, Tooltip } from "@kyokusu-ui/vue";
-import { ref, onMounted, onUnmounted } from "vue";
+import { RichText as BaseRichTextEditor, Tooltip } from '@kyokusu-ui/vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps<{
-  modelValue: string;
-  canRemove: boolean;
-}>();
+  modelValue: string
+  canRemove: boolean
+}>()
 
 const emit = defineEmits<{
-  "update:modelValue": [value: string];
-  remove: [];
-  addTextAfter: [];
-  addImageAfter: [];
-  dragStart: [];
-  dragEnd: [];
-  splitText: [payload: { beforeHTML: string; selectedHTML: string; afterHTML: string }];
-}>();
+  'update:modelValue': [value: string]
+  remove: []
+  addTextAfter: []
+  addImageAfter: []
+  dragStart: []
+  dragEnd: []
+  splitText: [payload: { beforeHTML: string; selectedHTML: string; afterHTML: string }]
+}>()
 
-const contextMenu = ref({ visible: false, x: 0, y: 0 });
+const contextMenu = ref({ visible: false, x: 0, y: 0 })
 
 function onContextMenu(e: MouseEvent) {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return
 
-  const target = e.target as HTMLElement | null;
-  if (!target?.closest("[contenteditable]")) return;
+  const target = e.target as HTMLElement | null
+  if (!target?.closest('[contenteditable]')) return
 
-  e.preventDefault();
-  contextMenu.value = { visible: true, x: e.clientX, y: e.clientY };
+  e.preventDefault()
+  contextMenu.value = { visible: true, x: e.clientX, y: e.clientY }
 }
 
 function splitSelectedText() {
-  const sel = window.getSelection();
+  const sel = window.getSelection()
   if (!sel || sel.isCollapsed || !sel.rangeCount) {
-    closeContextMenu();
-    return;
+    closeContextMenu()
+    return
   }
 
-  const range = sel.getRangeAt(0);
-  const container = range.commonAncestorContainer;
+  const range = sel.getRangeAt(0)
+  const container = range.commonAncestorContainer
   const editorEl = (
     container instanceof HTMLElement
-      ? container.closest("[contenteditable]")
-      : container.parentElement?.closest("[contenteditable]")
-  ) as HTMLElement | null;
+      ? container.closest('[contenteditable]')
+      : container.parentElement?.closest('[contenteditable]')
+  ) as HTMLElement | null
 
   if (!editorEl) {
-    closeContextMenu();
-    return;
+    closeContextMenu()
+    return
   }
 
   // Selected HTML
-  const selectedDiv = document.createElement("div");
-  selectedDiv.appendChild(range.cloneContents());
-  const selectedHTML = selectedDiv.innerHTML;
+  const selectedDiv = document.createElement('div')
+  selectedDiv.appendChild(range.cloneContents())
+  const selectedHTML = selectedDiv.innerHTML
 
   // HTML before selection
-  const beforeRange = document.createRange();
-  beforeRange.selectNodeContents(editorEl);
-  beforeRange.setEnd(range.startContainer, range.startOffset);
-  const beforeDiv = document.createElement("div");
-  beforeDiv.appendChild(beforeRange.cloneContents());
-  const beforeHTML = beforeDiv.innerHTML;
+  const beforeRange = document.createRange()
+  beforeRange.selectNodeContents(editorEl)
+  beforeRange.setEnd(range.startContainer, range.startOffset)
+  const beforeDiv = document.createElement('div')
+  beforeDiv.appendChild(beforeRange.cloneContents())
+  const beforeHTML = beforeDiv.innerHTML
 
   // HTML after selection
-  const afterRange = document.createRange();
-  afterRange.selectNodeContents(editorEl);
-  afterRange.setStart(range.endContainer, range.endOffset);
-  const afterDiv = document.createElement("div");
-  afterDiv.appendChild(afterRange.cloneContents());
-  const afterHTML = afterDiv.innerHTML;
+  const afterRange = document.createRange()
+  afterRange.selectNodeContents(editorEl)
+  afterRange.setStart(range.endContainer, range.endOffset)
+  const afterDiv = document.createElement('div')
+  afterDiv.appendChild(afterRange.cloneContents())
+  const afterHTML = afterDiv.innerHTML
 
-  closeContextMenu();
-  emit("splitText", { beforeHTML, selectedHTML, afterHTML });
+  closeContextMenu()
+  emit('splitText', { beforeHTML, selectedHTML, afterHTML })
 }
 
 function closeContextMenu() {
-  contextMenu.value.visible = false;
+  contextMenu.value.visible = false
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === "Escape") closeContextMenu();
+  if (e.key === 'Escape') closeContextMenu()
 }
 
 onMounted(() => {
-  document.addEventListener("click", closeContextMenu);
-  document.addEventListener("keydown", onKeyDown);
-});
+  document.addEventListener('click', closeContextMenu)
+  document.addEventListener('keydown', onKeyDown)
+})
 
 onUnmounted(() => {
-  document.removeEventListener("click", closeContextMenu);
-  document.removeEventListener("keydown", onKeyDown);
-});
+  document.removeEventListener('click', closeContextMenu)
+  document.removeEventListener('keydown', onKeyDown)
+})
 </script>
 
 <template>
@@ -111,29 +111,17 @@ onUnmounted(() => {
       <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Текст</span>
       <div class="ml-auto flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
         <Tooltip text="Добавить текстовый блок ниже">
-          <button
-            type="button"
-            class="rounded-md cursor-pointer"
-            @click="emit('addTextAfter')"
-          >
+          <button type="button" class="rounded-md cursor-pointer" @click="emit('addTextAfter')">
             <Icon name="ph:text-t-bold" size="14" class="text-zinc-500" />
           </button>
         </Tooltip>
         <Tooltip text="Добавить изображение ниже">
-          <button
-            type="button"
-            class="rounded-md cursor-pointer"
-            @click="emit('addImageAfter')"
-          >
+          <button type="button" class="rounded-md cursor-pointer" @click="emit('addImageAfter')">
             <Icon name="ph:image-bold" size="14" class="text-zinc-500" />
           </button>
         </Tooltip>
         <Tooltip v-if="canRemove" text="Удалить блок">
-          <button
-            type="button"
-            class="rounded-md cursor-pointer"
-            @click="emit('remove')"
-          >
+          <button type="button" class="rounded-md cursor-pointer" @click="emit('remove')">
             <Icon name="ph:trash-bold" size="14" class="text-red-500" />
           </button>
         </Tooltip>
@@ -151,7 +139,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         v-if="contextMenu.visible"
-        class="fixed z-99 px-2 py-1 min-w-50 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700  rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+        class="fixed z-99 px-2 py-1 min-w-50 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
         :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       >
         <button

@@ -54,7 +54,9 @@ function formatNumber(n: number): string {
 </script>
 
 <template>
-  <div class="bg-white dark:bg-zinc-900/40 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+  <div
+    class="bg-white dark:bg-zinc-900/40 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm"
+  >
     <div class="border-t border-zinc-200 dark:border-zinc-700 mb-6"></div>
 
     <div v-if="isLoading" class="flex justify-center py-12">
@@ -77,7 +79,9 @@ function formatNumber(n: number): string {
           {{ formatNumber(block.value) }}
         </span>
 
-        <span class="text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 text-center leading-tight">
+        <span
+          class="text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 text-center leading-tight"
+        >
           {{ block.label }}
         </span>
       </div>

@@ -1,12 +1,12 @@
 export interface PrivacyCardItem {
-  title: string;
-  description?: string;
-  text?: string;
+  title: string
+  description?: string
+  text?: string
 
-  subcards?: PrivacySubCard[];
+  subcards?: PrivacySubCard[]
 }
 
 export interface PrivacySubCard {
-  title: string;
-  text: string;
+  title: string
+  text: string
 }
