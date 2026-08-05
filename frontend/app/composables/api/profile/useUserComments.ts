@@ -11,7 +11,7 @@ export function useUserComments() {
       const data = await $api<UserCommentResponse[]>(`/api/user/${userID}/comments`)
       comments.value = data || []
       return data
-    } catch (_e) {
+    } catch {
       comments.value = []
     } finally {
       isLoading.value = false

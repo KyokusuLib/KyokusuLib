@@ -27,7 +27,7 @@ export function useAuthors() {
         metier: a.metier,
         bio: a.bio,
       }))
-    } catch (_e) {
+    } catch {
       foundAuthors.value = []
     } finally {
       isSearching.value = false
@@ -40,7 +40,7 @@ export function useAuthors() {
     try {
       const data = await $api<NovelaAuthorDetails>(`/api/author/${authorId}`)
       return data
-    } catch (_e) {
+    } catch {
       return null
     } finally {
       isSearching.value = false

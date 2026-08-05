@@ -11,7 +11,7 @@ export function useUserExperiance() {
       }
 
       return data.value!
-    } catch (_e) {
+    } catch {
       return null
     }
   }

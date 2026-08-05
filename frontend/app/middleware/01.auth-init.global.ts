@@ -8,7 +8,7 @@ export default defineNuxtRouteMiddleware(async (_to, _from) => {
   if (token.value && !authStore.isAuthenticated) {
     try {
       await authStore.initAuth()
-    } catch (_e) {
+    } catch {
       token.value = null
     }
   }

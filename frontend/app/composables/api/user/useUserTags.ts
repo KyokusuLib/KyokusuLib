@@ -11,7 +11,7 @@ export function useUserTags() {
       }
 
       return data.value!
-    } catch (_e) {
+    } catch {
       return null
     }
   }

@@ -260,7 +260,7 @@ export function useProfileSettings() {
         content: 'Настройки профиля сохранены',
         type: 'success',
       })
-    } catch (_e: any) {
+    } catch {
       errors.value.global = 'Ошибка при сохранении'
       notify({
         title: 'Неудача',

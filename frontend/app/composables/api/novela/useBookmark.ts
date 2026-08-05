@@ -105,7 +105,7 @@ export function useBookmark() {
       })
 
       userBookmarkNovels.value = data || []
-    } catch (_e) {
+    } catch {
       userBookmarkNovels.value = []
     } finally {
       loading.value = false
