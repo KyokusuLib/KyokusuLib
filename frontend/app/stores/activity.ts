@@ -17,7 +17,9 @@ export const useActivityStore = defineStore('activity', () => {
 
   const isUserActive = computed(() => {
     const status = online.value && focused.value && !idle.value
-    if (status) user.value!.status = DashboardRowUserStatus.online
+    if (status && user.value) {
+      user.value.status = DashboardRowUserStatus.online
+    }
     return status
   })
 
