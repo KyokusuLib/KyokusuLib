@@ -37,6 +37,8 @@ type Config struct {
 
 	RedisAddr     string
 	RedisPassword string
+
+	TgBotApiKey string
 }
 
 func Load() *Config {
@@ -73,6 +75,8 @@ func Load() *Config {
 
 		RedisAddr:     getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+
+		TgBotApiKey: getEnv("TG_BOT_API_KEY", ""),
 	}
 }
 

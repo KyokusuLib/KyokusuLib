@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { ref } from 'vue'
 import { staticImage } from '@/utils/str'
@@ -9,9 +8,12 @@ import { useRolePermissions } from '@/composables/api/role/useRolePermissions'
 import { useSearch } from '@/composables/api/search/useSearch'
 import { useNotifications } from '@/composables/api/notifications/useNotifications'
 import SearchModal from '@/components/common/SearchModal.vue'
+import UserDropdown from '@/components/common/UserDropdown.vue'
+import AdditionalDropdown from '@/components/common/AdditionalDropdown.vue'
 import { KyokusuAppRole } from '@/types/enums/role-enum'
 import { textMaxNumValue } from '@/utils/str'
 import { MAX_UNREAD_COUNT } from '@/constants/data'
+
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,21 +23,12 @@ const { openSearch } = useSearch()
 const { unreadCount } = useNotifications()
 
 const isMobileMenuOpen = ref(false)
-const isUserDropdownOpen = ref(false)
-const isContentSubmenuOpen = ref(false)
-const userDropdownRef = ref(null)
 
 const toggleMobileMenu = () => (isMobileMenuOpen.value = !isMobileMenuOpen.value)
 const closeMobileMenu = () => (isMobileMenuOpen.value = false)
 
-onClickOutside(userDropdownRef, () => {
-  isUserDropdownOpen.value = false
-  isContentSubmenuOpen.value = false
-})
-
 const handleLogout = async () => {
   await authStore.logout()
-  isUserDropdownOpen.value = false
   closeMobileMenu()
 }
 
@@ -45,8 +38,8 @@ const goToLogin = () => {
 }
 
 const handleGlobalSearchShortcut = (e: KeyboardEvent) => {
+  e.preventDefault()
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
     openSearch()
     closeMobileMenu()
   }
@@ -95,11 +88,8 @@ onUnmounted(() => {
             <Icon name="ph:chats-circle-bold" size="16" class="text-zinc-700 dark:text-zinc-200" />
             Форум
           </NuxtLink>
-          <button
-            class="flex items-center gap-2 px-6 py-3 rounded-2xl bg-zinc-300 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-white"
-          >
-            <span class="flex items-center cursor-pointer">...</span>
-          </button>
+          
+          <AdditionalDropdown />
         </nav>
       </div>
 
@@ -157,136 +147,12 @@ onUnmounted(() => {
           <span class="hidden lg:inline font-medium">Закладки</span>
         </NuxtLink>
 
-        <div class="relative" ref="userDropdownRef">
-          <button
-            v-if="isAuthenticated && user"
-            @click="isUserDropdownOpen = !isUserDropdownOpen"
-            class="flex items-center focus:outline-none"
-          >
-            <div
-              class="h-10 w-10 rounded-full cursor-pointer bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center overflow-hidden border-2 border-transparent hover:border-zinc-400 dark:hover:border-zinc-300/50 transition-colors"
-            >
-              <img
-                :src="staticImage(user.picture)"
-                class="w-full h-full object-cover"
-                alt="Avatar"
-              />
-            </div>
-          </button>
-
-          <button
-            v-else
-            @click="goToLogin"
-            class="hidden md:flex justify-center gap-2 items-center bg-zinc-300 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors px-6 py-3 rounded-2xl cursor-pointer"
-          >
-            <Icon name="ph:sign-in-bold" size="20" />
-            <span class="font-medium">Войти</span>
-          </button>
-
-          <Transition name="fade">
-            <div
-              v-if="isUserDropdownOpen"
-              class="absolute right-0 mt-3 w-56 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl py-2 px-2 flex flex-col z-60"
-            >
-              <div
-                class="px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/50 mb-1 text-center"
-              >
-                <p class="text-sm font-semibold text-zinc-900 dark:text-white truncate">
-                  {{ user?.name }}
-                </p>
-                <p class="text-xs text-zinc-500 truncate">{{ user?.email }}</p>
-              </div>
-
-              <NuxtLink
-                :to="`/profile/${user?.id}`"
-                class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white transition-colors"
-                @click="isUserDropdownOpen = false"
-              >
-                <span>Профиль</span>
-                <Icon name="ph:user-bold" size="18" />
-              </NuxtLink>
-
-              <NuxtLink
-                to="/profile/settings"
-                class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white transition-colors"
-                @click="isUserDropdownOpen = false"
-              >
-                <span>Настройки</span>
-                <Icon name="ph:gear-six-bold" size="18" />
-              </NuxtLink>
-
-              <NuxtLink
-                v-if="hasPermission(KyokusuAppRole.MODERATOR)"
-                to="/dashboard"
-                class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white transition-colors"
-                @click="isUserDropdownOpen = false"
-              >
-                <span>Панель управления</span>
-                <Icon name="ph:chalkboard-simple-bold" size="18" />
-              </NuxtLink>
-
-              <div
-                class="relative"
-                @mouseenter="isContentSubmenuOpen = true"
-                @mouseleave="isContentSubmenuOpen = false"
-              >
-                <div
-                  v-if="isAuthenticated"
-                  class="flex justify-between items-center rounded-full cursor-pointer px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white transition-colors"
-                >
-                  <span>Добавить контент</span>
-                  <Icon name="ph:palette-bold" size="18" />
-                </div>
-
-                <Transition name="fade">
-                  <div
-                    v-if="isContentSubmenuOpen"
-                    class="absolute top-0 left-full ml-2 w-48 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl py-2 px-2 z-[70]"
-                  >
-                    <NuxtLink
-                      v-if="hasPermission(KyokusuAppRole.MODERATOR)"
-                      to="/novela/add"
-                      class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-                      @click="isUserDropdownOpen = false"
-                    >
-                      <span>Новелла</span>
-                      <Icon name="ph:book-open-bold" size="18" />
-                    </NuxtLink>
-
-                    <NuxtLink
-                      v-if="hasPermission(KyokusuAppRole.MODERATOR)"
-                      to="/author/add"
-                      class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-                      @click="isUserDropdownOpen = false"
-                    >
-                      <span>Автора</span>
-                      <Icon name="ph:pen-nib-bold" size="18" />
-                    </NuxtLink>
-
-                    <NuxtLink
-                      to="/team/add"
-                      class="flex justify-between items-center rounded-full px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-                      @click="isUserDropdownOpen = false"
-                    >
-                      <span>Команду</span>
-                      <Icon name="ph:users-three-bold" size="18" />
-                    </NuxtLink>
-                  </div>
-                </Transition>
-              </div>
-
-              <div class="h-px bg-zinc-200 dark:bg-zinc-700/50 my-1"></div>
-
-              <button
-                @click="handleLogout"
-                class="flex justify-between items-center rounded-full cursor-pointer px-4 py-2 text-sm text-zinc-600 hover:bg-red-50 hover:text-red-500 dark:text-zinc-300 dark:hover:bg-red-500/10 dark:hover:text-red-300 transition-colors"
-              >
-                <span>Выйти</span>
-                <Icon name="ph:sign-out-bold" size="18" />
-              </button>
-            </div>
-          </Transition>
-        </div>
+        <UserDropdown
+          :user="user"
+          :is-authenticated="isAuthenticated"
+          @logout="handleLogout"
+          @login="goToLogin"
+        />
 
         <button
           @click="toggleMobileMenu"
@@ -426,16 +292,5 @@ onUnmounted(() => {
 .slide-fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-5px);
 }
 </style>
