@@ -33,6 +33,44 @@ export function fmtDateTime(dateStr: string | null | undefined): string {
   })
 }
 
+export function fmtRelativeTime(dateStr: string | null | undefined, now: Date = new Date()): string {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  const diffMs = now.getTime() - date.getTime()
+  if (diffMs < 0) return fmtDateTime(dateStr)
+
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'только что'
+  if (minutes < 60) {
+    const m = Math.floor(minutes)
+    const label = plural(m, 'минуту', 'минуты', 'минут')
+    return `${m} ${label} назад`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    const label = plural(hours, 'час', 'часа', 'часов')
+    return `${hours} ${label} назад`
+  }
+
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'вчера'
+  if (days < 7) {
+    const label = plural(days, 'день', 'дня', 'дней')
+    return `${days} ${label} назад`
+  }
+
+  return fmtDateTime(dateStr)
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few
+  return many
+}
+
 export function fmtDate(dateStr: string | null | undefined): string {
   if (!dateStr) return 'Не указанно'
 
