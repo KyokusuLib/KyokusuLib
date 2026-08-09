@@ -11,7 +11,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
-	_ "golang.org/x/image/webp" 
+	_ "golang.org/x/image/webp"
 )
 
 func UploadImage(ctx context.Context, file multipart.File, header *multipart.FileHeader, folder string, width, height int) (string, error) {
@@ -33,8 +33,8 @@ func UploadImage(ctx context.Context, file multipart.File, header *multipart.Fil
 	}
 
 	newFilename := fmt.Sprintf("%s.jpg", uuid.New().String())
-	
-	baseUploadDir := "./uploads" 
+
+	baseUploadDir := "./uploads"
 	uploadDir := filepath.Join(baseUploadDir, folder)
 
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
@@ -50,4 +50,17 @@ func UploadImage(ctx context.Context, file multipart.File, header *multipart.Fil
 
 	publicURL := fmt.Sprintf("/uploads/%s/%s", folder, newFilename)
 	return publicURL, nil
+}
+
+// DeleteImage removes a previously uploaded image by its public URL.
+func DeleteImage(publicURL string) error {
+	if publicURL == "" {
+		return nil
+	}
+
+	path := filepath.Join(".", publicURL)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete image: %w", err)
+	}
+	return nil
 }

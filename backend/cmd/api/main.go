@@ -26,8 +26,10 @@ func main() {
 			
 
 			sse.NewNotificationHub,
+			sse.NewTgPostsHub,
 
 			repository.NewNotificationRepository,
+			repository.NewTgPostRepository,
 			repository.NewUserRepository,
 			repository.NewUserProfileSettingRepository,
 			repository.NewUserSocialsRepository,
@@ -46,6 +48,7 @@ func main() {
 			repository.NewUserExperianceRepository,
 
 			service.NewNotificationService,
+			service.NewTgPostService,
 			service.NewAuthService,
 			service.NewUserService,
 			service.NewUserActivityService,
@@ -64,6 +67,7 @@ func main() {
 			app.NewEmailService,
 
 			handlers.NewNotificationHandler,
+			handlers.NewTgPostHandler,
 			handlers.NewAuthHandler,
 			handlers.NewHealthHandler,
 			handlers.NewUserHandler,
@@ -102,6 +106,9 @@ func main() {
 			app.AsRoute(func(h *handlers.NotificationHandler) *routes.NotificationRoutes {
 				return &routes.NotificationRoutes{Handler: h}
 			}),
+			app.AsRoute(func(h *handlers.TgPostHandler) *routes.TgPostRoutes {
+				return &routes.TgPostRoutes{Handler: h}
+			}),
 			app.AsRoute(func(h *handlers.ModerationHandler) *routes.ModerationRoutes {
 				return &routes.ModerationRoutes{Handler: h}
 			}),
@@ -131,6 +138,7 @@ func main() {
 			app.RegisterStaticFiles,
 			app.StartBackgroundWorkers,
 			app.RegisterNotificationHubCleanup,
+			app.RegisterTgPostsHubCleanup,
 			app.RegisterRedisCleanup,
 			app.StartHTTPServer,
 		),

@@ -31,17 +31,28 @@ func RegisterStaticFiles(r *mux.Router) {
 	static.CreateStaticDirs(r)
 }
 
-func StartBackgroundWorkers(lc fx.Lifecycle, authService *service.AuthService, hub *sse.NotificationHub) {
+func StartBackgroundWorkers(lc fx.Lifecycle, authService *service.AuthService, hub *sse.NotificationHub, tgPostsHub *sse.TgPostsHub) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			go authService.StartCleanupWorker(ctx)
 			hub.Start(ctx)
+			tgPostsHub.Start(ctx)
 			return nil
 		},
 		OnStop: func(_ context.Context) error {
 			cancel()
+			return nil
+		},
+	})
+}
+
+func RegisterTgPostsHubCleanup(lc fx.Lifecycle, hub *sse.TgPostsHub) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			log.Println("Closing tg posts hub...")
+			hub.Close()
 			return nil
 		},
 	})
