@@ -1,3 +1,7 @@
 [submodule "apps/ranobehub-parser"]
 	path = apps/ranobehub-parser
-	url = https://github.com/Lanxre/ranobehub-parser.git
+	url = git@github.com:KyokusuLib/ranobehub-parser.git
+
+[submodule "apps/kyokusu-tg-bot"]
+	path = apps/kyokusu-tg-bot
+	url = git@github.com:KyokusuLib/kyokusu-tg-bot.git
