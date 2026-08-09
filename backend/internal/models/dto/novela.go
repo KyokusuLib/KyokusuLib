@@ -159,6 +159,42 @@ type AddChapterRequest struct {
 	Content       string  `json:"content" validate:"required"`
 }
 
+type UpdateVolumeRequest struct {
+	VolumeNumber int    `json:"volume_number" validate:"required"`
+	Title        string `json:"title"`
+}
+
+type UpdateChapterRequest struct {
+	ChapterNumber float64 `json:"chapter_number" validate:"required"`
+	Title         string  `json:"title"`
+	Content       string  `json:"content" validate:"required"`
+}
+
+type PendingVolume struct {
+	ID            string `json:"id"`
+	NovelaID      int    `json:"novela_id"`
+	NovelaTitle   string `json:"novela_title"`
+	Number        int    `json:"number"`
+	Title         string `json:"title"`
+	Status        string `json:"status"`
+	CreatedBy     int    `json:"created_by"`
+	CreatedByName string `json:"created_by_name"`
+}
+
+type PendingChapter struct {
+	ID            string  `json:"id"`
+	VolumeID      string  `json:"volume_id"`
+	VolumeNumber  int     `json:"volume_number"`
+	NovelaID      int     `json:"novela_id"`
+	NovelaTitle   string  `json:"novela_title"`
+	Number        float64 `json:"number"`
+	Title         string  `json:"title"`
+	Content       string  `json:"content"`
+	Status        string  `json:"status"`
+	CreatedBy     int     `json:"created_by"`
+	CreatedByName string  `json:"created_by_name"`
+}
+
 type AddChapterImageRequest struct {
 	ImageURL string `json:"image_url" validate:"required"`
 	Caption  string `json:"caption"`

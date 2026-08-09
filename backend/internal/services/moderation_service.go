@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
 )
 
@@ -86,4 +87,12 @@ func (s *ModerationService) ApproveChapter(ctx context.Context, id string) error
 
 func (s *ModerationService) RejectChapter(ctx context.Context, id string) error {
 	return s.NovelaRepo.UpdateChapterStatus(ctx, id, "rejected")
+}
+
+func (s *ModerationService) UpdateVolume(ctx context.Context, id string, req dto.UpdateVolumeRequest) error {
+	return s.NovelaRepo.UpdateVolume(ctx, id, req.VolumeNumber, req.Title)
+}
+
+func (s *ModerationService) UpdateChapter(ctx context.Context, id string, req dto.UpdateChapterRequest) error {
+	return s.NovelaRepo.UpdateChapter(ctx, id, req.ChapterNumber, req.Title, req.Content)
 }

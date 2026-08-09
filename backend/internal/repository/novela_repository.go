@@ -84,11 +84,11 @@ func (r *NovelaRepository) Create(ctx context.Context, n *db.Novela) error {
 func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, userID int) (*db.Novela, error) {
 	n := &db.Novela{}
 	var (
-		authorsJSON      []byte
-		volumesJSON      []byte
-		userRating       sql.NullInt32
-		bookmark         sql.NullString
-		lastReadChapter  sql.NullString
+		authorsJSON     []byte
+		volumesJSON     []byte
+		userRating      sql.NullInt32
+		bookmark        sql.NullString
+		lastReadChapter sql.NullString
 	)
 
 	query := `
@@ -436,11 +436,11 @@ func (r *NovelaRepository) GetChapterByID(ctx context.Context, chapterID string)
 		return nil, err
 	}
 	defer rows.Close()
- 
+
 	for rows.Next() {
 		var img db.NovelaChapterImage
 		var caption sql.NullString
- 
+
 		if err := rows.Scan(&img.ID, &img.ImageURL, &caption, &img.Position); err != nil {
 			return nil, err
 		}
@@ -852,19 +852,34 @@ func (r *NovelaRepository) CheckUserNovelaTeamPermission(ctx context.Context, us
 	return exists, err
 }
 
-func (r *NovelaRepository) GetPendingVolumes(ctx context.Context) ([]db.NovelaVolume, error) {
-	query := `SELECT id, novela_id, volume_number, title, status, created_by FROM novela_volumes WHERE status = 'pending'`
+func (r *NovelaRepository) GetPendingVolumes(ctx context.Context) ([]dto.PendingVolume, error) {
+	query := `
+		SELECT v.id, v.novela_id, n.title, v.volume_number, COALESCE(v.title, ''),
+		       v.status, COALESCE(v.created_by, 0), COALESCE(up.name, '')
+		FROM novela_volumes v
+		JOIN novela n ON n.id = v.novela_id
+		LEFT JOIN user_profiles up ON up.user_id = v.created_by
+		WHERE v.status = 'pending'
+		ORDER BY v.volume_number`
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var volumes []db.NovelaVolume
+	volumes := make([]dto.PendingVolume, 0)
 	for rows.Next() {
-		var v db.NovelaVolume
-		var novelaID int
-		if err := rows.Scan(&v.ID, &novelaID, &v.Number, &v.Title, &v.Status, &v.CreatedBy); err != nil {
+		var v dto.PendingVolume
+		if err := rows.Scan(
+			&v.ID,
+			&v.NovelaID,
+			&v.NovelaTitle,
+			&v.Number,
+			&v.Title,
+			&v.Status,
+			&v.CreatedBy,
+			&v.CreatedByName,
+		); err != nil {
 			return nil, err
 		}
 		volumes = append(volumes, v)
@@ -872,24 +887,50 @@ func (r *NovelaRepository) GetPendingVolumes(ctx context.Context) ([]db.NovelaVo
 	return volumes, nil
 }
 
-func (r *NovelaRepository) GetPendingChapters(ctx context.Context) ([]db.NovelaChapter, error) {
-	query := `SELECT id, novela_volume_id, chapter_number, title, status, created_by FROM novela_chapters WHERE status = 'pending'`
+func (r *NovelaRepository) GetPendingChapters(ctx context.Context) ([]dto.PendingChapter, error) {
+	query := `
+		SELECT c.id, c.novela_volume_id, v.volume_number, v.novela_id, n.title,
+		       c.chapter_number, COALESCE(c.title, ''), COALESCE(c.content, ''),
+		       c.status, COALESCE(c.created_by, 0), COALESCE(up.name, '')
+		FROM novela_chapters c
+		JOIN novela_volumes v ON v.id = c.novela_volume_id
+		JOIN novela n ON n.id = v.novela_id
+		LEFT JOIN user_profiles up ON up.user_id = c.created_by
+		WHERE c.status = 'pending'
+		ORDER BY v.volume_number, c.chapter_number`
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var chapters []db.NovelaChapter
+	chapters := make([]dto.PendingChapter, 0)
 	for rows.Next() {
-		var ch db.NovelaChapter
-		var volumeID string
-		if err := rows.Scan(&ch.ID, &volumeID, &ch.Number, &ch.Title, &ch.Status, &ch.CreatedBy); err != nil {
+		var ch dto.PendingChapter
+		if err := rows.Scan(
+			&ch.ID,
+			&ch.VolumeID,
+			&ch.VolumeNumber,
+			&ch.NovelaID,
+			&ch.NovelaTitle,
+			&ch.Number,
+			&ch.Title,
+			&ch.Content,
+			&ch.Status,
+			&ch.CreatedBy,
+			&ch.CreatedByName,
+		); err != nil {
 			return nil, err
 		}
 		chapters = append(chapters, ch)
 	}
 	return chapters, nil
+}
+
+func (r *NovelaRepository) UpdateVolume(ctx context.Context, id string, volumeNumber int, title string) error {
+	query := `UPDATE novela_volumes SET volume_number = $1, title = $2 WHERE id = $3`
+	_, err := r.DB.ExecContext(ctx, query, volumeNumber, title, id)
+	return err
 }
 
 func (r *NovelaRepository) UpdateVolumeStatus(ctx context.Context, id string, status string) error {
@@ -1020,7 +1061,7 @@ func (r NovelaRepository) GetMostSearchedGenres(ctx context.Context, limit int) 
 	defer rows.Close()
 
 	genres := make([]string, 0, limit)
-	
+
 	for rows.Next() {
 		var genre string
 		if err := rows.Scan(&genre); err != nil {
@@ -1052,7 +1093,7 @@ func (r NovelaRepository) GetMostSearchedCategories(ctx context.Context, limit i
 	defer rows.Close()
 
 	categories := make([]string, 0, limit)
-	
+
 	for rows.Next() {
 		var cat string
 		if err := rows.Scan(&cat); err != nil {
