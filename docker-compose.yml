@@ -39,6 +39,7 @@ services:
       - KYOKUSU_EMAIL_PASSWORD=${KYOKUSU_EMAIL_PASSWORD}
       - PARSER_URL=http://parser:3005
       - REDIS_ADDR=redis:6379
+      - TG_BOT_API_KEY=${TG_BOT_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -76,6 +77,19 @@ services:
       - SERVER_PORT=3005
     ports:
       - "3005:3005"
+
+  bot:
+    build:
+      context: ./apps/kyokusu-tg-bot
+      dockerfile: Dockerfile
+    container_name: kyokusu_bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BACKEND_URL=http://backend:8080
+      - TG_API_KEY=${TG_API_KEY}
+    depends_on:
+      - backend
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
