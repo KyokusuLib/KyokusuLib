@@ -40,6 +40,8 @@ services:
       - PARSER_URL=http://parser:3005
       - REDIS_ADDR=redis:6379
       - TG_BOT_API_KEY=${TG_BOT_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TG_CHANNEL_USERNAME=${TG_CHANNEL_USERNAME:-KyokusuLib}
     depends_on:
       db:
         condition: service_healthy

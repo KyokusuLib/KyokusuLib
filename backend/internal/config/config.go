@@ -39,6 +39,9 @@ type Config struct {
 	RedisPassword string
 
 	TgBotApiKey string
+
+	TgBotToken        string
+	TgChannelUsername string
 }
 
 func Load() *Config {
@@ -77,6 +80,9 @@ func Load() *Config {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 
 		TgBotApiKey: getEnv("TG_BOT_API_KEY", ""),
+
+		TgBotToken:        getEnv("TELEGRAM_BOT_TOKEN", ""),
+		TgChannelUsername: getEnv("TG_CHANNEL_USERNAME", "KyokusuLib"),
 	}
 }
 

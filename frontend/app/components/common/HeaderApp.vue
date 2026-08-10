@@ -14,7 +14,6 @@ import { KyokusuAppRole } from '@/types/enums/role-enum'
 import { textMaxNumValue } from '@/utils/str'
 import { MAX_UNREAD_COUNT } from '@/constants/data'
 
-
 const router = useRouter()
 const authStore = useAuthStore()
 const { user, isAuthenticated } = storeToRefs(authStore)
@@ -38,8 +37,8 @@ const goToLogin = () => {
 }
 
 const handleGlobalSearchShortcut = (e: KeyboardEvent) => {
-  e.preventDefault()
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault()
     openSearch()
     closeMobileMenu()
   }
@@ -62,8 +61,12 @@ onUnmounted(() => {
       class="mx-auto flex items-center justify-between px-4 py-4 md:px-8 lg:px-12 max-w-screen-2xl"
     >
       <div class="flex items-center gap-4 md:gap-8 flex-1">
-        <NuxtLink to="/" class="shrink-0" @click="closeMobileMenu">
-          <img :src="LogoIcon" alt="Logo" class="h-12 w-12 md:h-14 md:w-14 dark:invert" />
+        <NuxtLink
+          to="/"
+          class="bg-white dark:bg-zinc-800 hover:dark:bg-zinc-700 rounded-full shrink-0"
+          @click="closeMobileMenu"
+        >
+          <img :src="LogoIcon" alt="Logo" class="h-12 w-12 md:h-12 md:w-12 dark:invert" />
         </NuxtLink>
 
         <nav class="hidden md:flex items-center gap-2 lg:gap-4">
@@ -88,7 +91,7 @@ onUnmounted(() => {
             <Icon name="ph:chats-circle-bold" size="16" class="text-zinc-700 dark:text-zinc-200" />
             Форум
           </NuxtLink>
-          
+
           <AdditionalDropdown />
         </nav>
       </div>
@@ -223,7 +226,10 @@ onUnmounted(() => {
           <div class="w-full border-t border-zinc-200 dark:border-zinc-700 my-2 opacity-50"></div>
 
           <button
-            @click="openSearch(); closeMobileMenu()"
+            @click="
+              openSearch()
+              closeMobileMenu()
+            "
             class="flex items-center gap-3 px-6 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 w-full justify-center text-zinc-700 dark:text-zinc-200 cursor-pointer"
           >
             <Icon name="ph:magnifying-glass-bold" size="20" />

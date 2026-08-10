@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { Card, Button, TeleportedTooltip } from '@kyokusu-ui/vue'
-import { useNow } from '@vueuse/core'
 import PostImageSlider from '@/components/app/news/PostImageSlider.vue'
 import type { BackendTgPost } from '@/types/backend/tg-post'
 import type { NewsSource } from '@/types/frontend/news'
-import { fmtRelativeTime } from '@/utils/date'
+import { fmtDateTime } from '@/utils/date'
 import { sanitizeHtml } from '@/utils/sanitize'
 import { TG_CHANNEL_NAME } from '@/constants/news'
 
@@ -19,51 +18,45 @@ const emit = defineEmits<{
   delete: [post: BackendTgPost]
 }>()
 
-const now = useNow({ interval: 30_000 })
 const safeText = computed(() => sanitizeHtml(props.post.text))
-const relativeTime = computed(() => fmtRelativeTime(props.post.createdAt, now.value))
-
+const formattedDate = computed(() => fmtDateTime(props.post.createdAt))
 </script>
 
 <template>
-  <Card
-    variant="outline"
-    padding="sm"
-    shadow
-    class="post-card transition-shadow hover:shadow-lg"
-    :style="{ borderLeftColor: source.color, borderLeftWidth: '3px' }"
-  >
+  <Card variant="outline" padding="sm" shadow class="post-card transition-shadow hover:shadow-lg">
     <div class="flex flex-col gap-3">
       <div class="flex items-start justify-between gap-2">
         <NuxtLink :to="postUrl" target="_blank">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white"
-                :style="source.styles"
-              >
-                <Icon :name="source.icon" size="18" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-extrabold leading-tight">{{ TG_CHANNEL_NAME }}</div>
-                <p class="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  <Icon name="ph:clock" size="14" />
-                  {{ relativeTime }}
-                </p>
-              </div>
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white"
+              :style="source.styles"
+            >
+              <Icon :name="source.icon" size="18" />
             </div>
+            <div class="min-w-0">
+              <div class="font-extrabold leading-tight">{{ TG_CHANNEL_NAME }}</div>
+              <p class="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <Icon name="ph:clock" size="14" />
+                <span>
+                  {{ formattedDate }}
+                </span>
+              </p>
+            </div>
+          </div>
         </NuxtLink>
 
         <div class="flex items-center gap-1">
           <TeleportedTooltip text="Открыть в Telegram">
-              <a
-                :href="postUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Открыть пост в Telegram"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-zinc-700 dark:hover:text-zinc-200"
-              >
-                <Icon name="ph:arrow-up-right-bold" size="16" />
-              </a>
+            <a
+              :href="postUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Открыть пост в Telegram"
+              class="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              <Icon name="ph:arrow-up-right-bold" size="16" />
+            </a>
           </TeleportedTooltip>
           <Button
             v-if="canDelete"
@@ -79,8 +72,7 @@ const relativeTime = computed(() => fmtRelativeTime(props.post.createdAt, now.va
 
       <div
         v-if="post.text"
-        class="tg-content rounded-xl border-l-4 border-zinc-500/40 bg-zinc-500/10 p-3 text-sm font-medium whitespace-pre-line wrap-break-words dark:bg-zinc-800/40"
-        :style="{ borderLeftColor: source.color }"
+        class="tg-content rounded-xl border-2 border-zinc-500/40 bg-zinc-500/10 p-3 text-sm font-medium whitespace-pre-line wrap-break-words dark:bg-zinc-800/40"
         v-html="safeText"
       />
       <PostImageSlider v-if="post.imageUrls.length > 0" :images="post.imageUrls" />

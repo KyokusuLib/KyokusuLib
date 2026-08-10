@@ -9,6 +9,7 @@ import { useInfiniteScroll, useEventListener } from '@vueuse/core'
 import { Tooltip } from '@kyokusu-ui/vue'
 import { useRolePermissions } from '@/composables/api/role/useRolePermissions'
 import { KyokusuAppRole } from '~/types/enums/role-enum'
+import LightBoxImage from '@/components/ui/LightBoxImage.vue'
 
 const route = useRoute()
 const { chapters, isLoading, isAppending, fetchChapter } = useReader()
@@ -156,16 +157,6 @@ function openLightbox(url: string) {
   lightboxImage.value = url
 }
 
-function closeLightbox() {
-  lightboxImage.value = null
-}
-
-useEventListener(window, 'keydown', (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && lightboxImage.value) {
-    closeLightbox()
-  }
-})
-
 function onContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (target.tagName === 'IMG' && target.closest('.prose')) {
@@ -183,7 +174,7 @@ const textColor = ref('text-zinc-900 dark:text-zinc-200')
 <template>
   <div class="min-h-screen transition-colors duration-300" :class="backgroundColor">
     <header
-      class="sticky z-30 top-20.5 md:top-22.5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800"
+      class="sticky z-30 top-20.5 md:top-20.5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800"
     >
       <div class="max-w-5xl mx-auto px-4 h-16 grid grid-cols-[auto_1fr_auto] items-center gap-4">
         <div class="flex items-center gap-6 justify-start mt-1">
@@ -383,26 +374,7 @@ const textColor = ref('text-zinc-900 dark:text-zinc-200')
       </div>
     </footer>
 
-    <Transition name="fade">
-      <div
-        v-if="lightboxImage"
-        class="fixed inset-0 z-200 bg-black/90 flex items-center justify-center p-4"
-        @click="closeLightbox"
-      >
-        <button
-          class="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors cursor-pointer"
-          @click.stop="closeLightbox"
-        >
-          <Icon name="ph:x-bold" size="28" />
-        </button>
-        <img
-          :src="lightboxImage"
-          class="max-w-full max-h-full object-contain rounded-lg"
-          @click.stop
-          alt="NO IMAGE"
-        />
-      </div>
-    </Transition>
+    <LightBoxImage v-model="lightboxImage" />
   </div>
 </template>
 
@@ -420,15 +392,5 @@ const textColor = ref('text-zinc-900 dark:text-zinc-200')
   margin-left: auto;
   margin-right: auto;
   display: block;
-}
-
-/* Custom transitions for smoother reading experience */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>
