@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import LightBoxImage from '@/components/ui/LightBoxImage.vue'
+
 const props = defineProps<{
   images: string[]
 }>()
@@ -8,6 +10,12 @@ const current = ref(0)
 const showControls = computed(() => props.images.length > 1)
 
 const currentImage = computed(() => props.images[current.value])
+
+const lightboxImage = ref<string | null>(null)
+
+function openLightbox() {
+  lightboxImage.value = currentImage.value!
+}
 
 function next() {
   current.value = (current.value + 1) % props.images.length
@@ -25,7 +33,8 @@ function prev() {
       alt="Изображение поста"
       loading="lazy"
       decoding="async"
-      class="max-h-96 w-full rounded-lg object-contain"
+      class="max-h-96 w-full rounded-lg object-contain cursor-zoom-in"
+      @click="openLightbox"
     />
 
     <div v-if="showControls" class="absolute inset-y-0 left-0 flex items-center">
@@ -61,5 +70,7 @@ function prev() {
         @click="current = index"
       />
     </div>
+
+    <LightBoxImage v-model="lightboxImage" alt="Изображение поста" />
   </div>
 </template>

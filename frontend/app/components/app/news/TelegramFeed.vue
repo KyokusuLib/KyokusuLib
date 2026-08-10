@@ -11,12 +11,9 @@ import type { BackendTgPost } from '@/types/backend/tg-post'
 const { hasPermission } = useRolePermissions()
 const { posts, fetchTgPosts, connectStream, disconnectStream, deleteTgPost } = useTgPosts()
 
-const source = computed(() =>
-  NEWS_SOURCES.find((s) => s.id === SocialNetwork.Telegram),
-)
+const source = computed(() => NEWS_SOURCES.find((s) => s.id === SocialNetwork.Telegram))
 
-const postUrl = (post: BackendTgPost) =>
-  `https://t.me/${TG_CHANNEL_NAME}/${post.messageId}`
+const postUrl = (post: BackendTgPost) => `https://t.me/${TG_CHANNEL_NAME}/${post.messageId}`
 
 const canDelete = computed(() => hasPermission(KyokusuAppRole.MODERATOR))
 
@@ -53,10 +50,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col gap-3">
-    <p
-      v-if="posts.length === 0"
-      class="text-sm text-zinc-500 dark:text-zinc-400 text-center py-6"
-    >
+    <p v-if="posts.length === 0" class="text-sm text-zinc-500 dark:text-zinc-400 text-center py-6">
       Посты появятся, как только будут опубликованы в канале
     </p>
 
