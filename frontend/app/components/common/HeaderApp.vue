@@ -226,10 +226,7 @@ onUnmounted(() => {
           <div class="w-full border-t border-zinc-200 dark:border-zinc-700 my-2 opacity-50"></div>
 
           <button
-            @click="
-              openSearch()
-              closeMobileMenu()
-            "
+            @click="openSearch(); closeMobileMenu();"
             class="flex items-center gap-3 px-6 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 w-full justify-center text-zinc-700 dark:text-zinc-200 cursor-pointer"
           >
             <Icon name="ph:magnifying-glass-bold" size="20" />
