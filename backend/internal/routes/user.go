@@ -17,5 +17,7 @@ func (a *UserRoutes) Register(cfg *config.Config, r *mux.Router) {
 	s.HandleFunc("/tag", middleware.AuthMiddleware(a.Handler.UpdateUserTag, cfg.JWTSecret)).Methods("PUT")
 	s.HandleFunc("/{userId:[0-9]+}/status", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.UpdateUserStatus, middleware.RoleModerator), cfg.JWTSecret)).Methods("PUT") 
 
+	s.HandleFunc("/{userId:[0-9]+}", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.UpdateUser, middleware.RoleModerator), cfg.JWTSecret)).Methods("PUT")
+
 	s.HandleFunc("/{userId:[0-9]+}", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.DeleteUserById, middleware.RoleAdmin), cfg.JWTSecret)).Methods("DELETE") 
 }

@@ -39,3 +39,8 @@ type NovelaMonthlyRow struct {
 
 	ReadCount int
 }
+
+type UserStats struct {
+	TotalComments int
+	ReadChapters  int
+}

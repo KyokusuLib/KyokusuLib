@@ -52,6 +52,18 @@ type UpdateUserStatusDTO struct {
 	LastActive  int64   `json:"last_active"`
 }
 
+type UpdateUserDTO struct {
+	Name           string `json:"name" validate:"required,min=3,max=250"`
+	About          string `json:"about" validate:"max=500"`
+	Gender         string `json:"gender" validate:"oneof=male female hidden"`
+	Birthday       string `json:"birthday"`
+	IsPublic       bool   `json:"is_public"`
+	IsShowTag      bool   `json:"is_show_tag"`
+	IsShowBookmark bool   `json:"is_show_bookmark"`
+	Role           string `json:"role" validate:"oneof=user publisher moderator admin"`
+	Status         string `json:"status" validate:"oneof=online offline idle ban"`
+}
+
 type UserTagDTO struct {
 	ID 	  int `json:"tag_id"`
 	Tag   string `json:"tag"`

@@ -10,6 +10,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+var rateLimitScript = redis.NewScript(`
+	local current = redis.call('INCR', KEYS[1])
+	if current == 1 then
+	    redis.call('PEXPIRE', KEYS[1], ARGV[1])
+	end
+	return current
+`)
+
 func RateLimitMiddleware(redis *redis.Client, limit int, window time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -21,17 +29,13 @@ func RateLimitMiddleware(redis *redis.Client, limit int, window time.Duration) f
 			key := fmt.Sprintf("rate_limit:%s:%s", r.URL.Path, ip)
 			ctx := r.Context()
 
-			count, err := redis.Incr(ctx, key).Result()
+			count, err := rateLimitScript.Run(ctx, redis, []string{key}, window.Milliseconds()).Int()
 			if err != nil {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			if count == 1 {
-				redis.Expire(ctx, key, window)
-			}
-
-			if count > int64(limit) {
+			if count > limit {
 				response.Error(w, http.StatusTooManyRequests, "Too many requests. Please try again later.")
 				return
 			}

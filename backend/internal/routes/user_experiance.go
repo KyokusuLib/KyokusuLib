@@ -10,4 +10,5 @@ func (a *UserExperianceRoutes) Register(cfg *config.Config, r *mux.Router) {
 	s := r.PathPrefix("/api/user/experiance").Subrouter()
 	
 	s.HandleFunc("/definitions", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.GetDefinitions, middleware.RoleModerator), cfg.JWTSecret)).Methods("GET")
+	s.HandleFunc("", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.UpdateUserLevel, middleware.RoleModerator), cfg.JWTSecret)).Methods("PUT")
 }

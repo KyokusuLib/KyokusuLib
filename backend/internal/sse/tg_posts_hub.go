@@ -108,13 +108,9 @@ func (h *TgPostsHub) broadcast(ctx context.Context, ev TgPostEvent) {
 
 func (h *TgPostsHub) publishToLocalClients(ev TgPostEvent) {
 	h.mu.RLock()
-	snapshot := make([]TgPostsClient, 0, len(h.clients))
-	for client := range h.clients {
-		snapshot = append(snapshot, client)
-	}
-	h.mu.RUnlock()
+	defer h.mu.RUnlock()
 
-	for _, client := range snapshot {
+	for client := range h.clients {
 		select {
 		case client <- ev:
 		default:

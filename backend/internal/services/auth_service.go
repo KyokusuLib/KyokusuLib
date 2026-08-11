@@ -12,6 +12,7 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
 )
 
 type AuthService struct {
@@ -212,27 +213,40 @@ func (s *AuthService) UpdateStatus(ctx context.Context, userID int, isOnline boo
 }
 
 func (s *AuthService) enrichUserDTO(ctx context.Context, user *db.User) (*dto.GetUserDTO, error) {
-	tagsDB, err := s.Repo.GetUserTags(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
-	
-	userTags := make([]dto.UserTagDTO, len(tagsDB))
-	for i, t := range tagsDB {
-		userTags[i] = dto.UserTagDTO{
-			ID:  t.TagID,
-			Tag: t.Tag,
+	g, gctx := errgroup.WithContext(ctx)
+
+	var userTags []dto.UserTagDTO
+	g.Go(func() error {
+		tagsDB, err := s.Repo.GetUserTags(gctx, user.ID)
+		if err != nil {
+			return err
 		}
-	}
+		userTags = toUserTagDTOs(tagsDB)
+		return nil
+	})
 
-	userLevel, err := s.UserProfileRepo.GetUserLevel(ctx, user.ID)
-	if err != nil {
-		log.Printf("failed to get user level: %v", err)
-	}
+	var userLevel *db.UserLevel
+	g.Go(func() error {
+		level, err := s.UserProfileRepo.GetUserLevel(gctx, user.ID)
+		if err != nil {
+			log.Printf("failed to get user level: %v", err)
+		}
+		userLevel = level
+		return nil
+	})
 
-	totalComments, readChapters, err := s.Repo.GetUserStats(ctx, user.ID)
-	if err != nil {
-		log.Printf("failed to get user stats: %v", err)
+	var totalComments, readChapters int
+	g.Go(func() error {
+		comments, chapters, err := s.Repo.GetUserStats(gctx, user.ID)
+		if err != nil {
+			log.Printf("failed to get user stats: %v", err)
+		}
+		totalComments, readChapters = comments, chapters
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	return s.toUserDTO(user, userTags, userLevel, totalComments, readChapters), nil

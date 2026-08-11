@@ -322,6 +322,13 @@ func (r *NovelaStatisticsRepository) GetMonthlyNovelaSeries(ctx context.Context,
 	return stats, rows.Err()
 }
 
+func (r *NovelaStatisticsRepository) CountNovelas(ctx context.Context) (int, error) {
+	query := `SELECT COUNT(*) FROM novela`
+	var count int
+	err := r.DB.QueryRowContext(ctx, query).Scan(&count)
+	return count, err
+}
+
 func (r *NovelaStatisticsRepository) startOfPeriod(period constants.StatisticsPeriodSort) *time.Time {
 	now := time.Now()
 	var day int

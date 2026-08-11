@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lib/pq"
 )
 
 type UserProfileRepository struct {
@@ -59,6 +61,57 @@ func (r *UserProfileRepository) GetUserLevel(ctx context.Context, userID int) (*
 	u.Experience = experience
 
 	return u, nil
+}
+
+func (r *UserProfileRepository) GetUserLevelsBatch(ctx context.Context, userIDs []int) (map[int]*db.UserLevel, error) {
+	result := make(map[int]*db.UserLevel, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			p.user_id, p.level, p.experience,
+			ld.title AS level_title,
+			ld.total_xp_required AS xp_for_this_level,
+			COALESCE(next_ld.total_xp_required, ld.total_xp_required) AS xp_for_next_level
+		FROM user_profiles p
+		LEFT JOIN level_definitions ld ON ld.level = p.level
+		LEFT JOIN level_definitions next_ld ON next_ld.level = p.level + 1
+		WHERE p.user_id = ANY($1)
+	`
+
+	rows, err := r.DB.QueryContext(ctx, query, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID int
+		u := &db.UserLevel{}
+		var (
+			levelTitle     sql.NullString
+			xpForThisLevel sql.NullInt64
+			xpForNextLevel sql.NullInt64
+		)
+
+		if err := rows.Scan(&userID, &u.Level, &u.Experience, &levelTitle, &xpForThisLevel, &xpForNextLevel); err != nil {
+			return nil, err
+		}
+
+		if levelTitle.Valid {
+			u.LevelTitle = levelTitle.String
+		}
+
+		if xpForNextLevel.Valid && xpForThisLevel.Valid {
+			u.XPForNext = max(xpForNextLevel.Int64-u.Experience, 0)
+		}
+
+		result[userID] = u
+	}
+
+	return result, rows.Err()
 }
 
 func (r *UserProfileRepository) GetLevelDefinition(ctx context.Context, level int) (*db.LevelDefinition, error) {

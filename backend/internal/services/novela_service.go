@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"strconv"
 	"time"
@@ -210,13 +211,24 @@ func (s *NovelaService) GetNovelas(ctx context.Context, userID int, f dto.Novela
 	}
 
 	res := make([]dto.NovelaResponse, 0, len(dbNovelas))
+	novelaIDs := make([]int, 0, len(dbNovelas))
+	for _, n := range dbNovelas {
+		novelaIDs = append(novelaIDs, n.ID)
+	}
+
+	ratings, err := s.RatingRepo.GetRatingsBatch(tx, ctx, novelaIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	bookmarks, err := s.BookmarkRepo.GetBookmarkStatsBatch(tx, ctx, novelaIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	for _, n := range dbNovelas {
 		d := s.novelaToDto(&n)
-		ratingData, _ := s.RatingRepo.GetRating(tx, ctx, d.ID)
-		bookmarkData, _ := s.BookmarkRepo.GetBookmarkStats(tx, ctx, d.ID)
-
-		d.RatingDetails = s.mapRatingToDto(ratingData)
-		d.BookmarkDetails = s.mapBookmarkToDto(bookmarkData)
+		d.RatingDetails = s.mapRatingToDto(ratings[d.ID])
+		d.BookmarkDetails = s.mapBookmarkToDto(bookmarks[d.ID])
 
 		res = append(res, d)
 	}
@@ -380,7 +392,7 @@ func (s *NovelaService) AddVolume(ctx context.Context, novelaID int, userID int,
 
 	id, err := s.Repo.AddVolume(ctx, novelaID, req.VolumeNumber, req.Title, status, userID)
 	if err == nil && status == "approved" {
-		go s.sendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлен новый том!")
+		go s.safeSendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлен новый том!")
 	}
 	return id, status, err
 }
@@ -408,7 +420,7 @@ func (s *NovelaService) AddChapter(ctx context.Context, volumeID string, userID 
 
 	id, err := s.Repo.AddChapter(ctx, volumeID, req.ChapterNumber, req.Title, req.Content, status, userID)
 	if err == nil && status == "approved" {
-		go s.sendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлена новая глава!")
+		go s.safeSendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлена новая глава!")
 	}
 	return id, status, err
 }
@@ -424,9 +436,24 @@ func (s *NovelaService) sendNovelaNotification(novelaID int, title, messageFmt s
 		return
 	}
 	message := fmt.Sprintf(messageFmt, novelaTitle)
-	for _, userID := range userIDs {
-		s.NotificationService.Create(bgCtx, int64(userID), title, message)
+
+	intIDs := make([]int64, len(userIDs))
+	for i, userID := range userIDs {
+		intIDs[i] = int64(userID)
 	}
+
+	if err := s.NotificationService.CreateBatch(bgCtx, intIDs, title, message); err != nil {
+		return
+	}
+}
+
+func (s *NovelaService) safeSendNovelaNotification(novelaID int, title, messageFmt string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("panic in sendNovelaNotification: %v", r)
+		}
+	}()
+	s.sendNovelaNotification(novelaID, title, messageFmt)
 }
 
 func (s *NovelaService) DeleteChapterImages(ctx context.Context, chapterID string) error {
@@ -435,6 +462,10 @@ func (s *NovelaService) DeleteChapterImages(ctx context.Context, chapterID strin
 
 func (s *NovelaService) AddChapterImage(ctx context.Context, chapterID string, req dto.AddChapterImageRequest) (int, error) {
 	return s.Repo.AddChapterImage(ctx, chapterID, req.ImageURL, req.Caption, req.Position)
+}
+
+func (s *NovelaService) AddChapterImages(ctx context.Context, chapterID string, images []dto.AddChapterImageRequest) error {
+	return s.Repo.AddChapterImages(ctx, chapterID, images)
 }
 
 func (s *NovelaService) GetChapterReaderDetails(ctx context.Context, chapterID string, userID int) (*dto.ChapterReaderResponse, error) {
@@ -551,8 +582,10 @@ func (s *NovelaService) canManageChapter(ctx context.Context, userID int, chapte
 }
 
 func (s *NovelaService) GetMostSearched(ctx context.Context, limit int) (*dto.MostSearchedResponse, error) {
+	cacheKey := fmt.Sprintf("most_searched:%d", limit)
+
 	if s.redis != nil {
-		val, err := s.redis.Get(ctx, "most_searched:").Result()
+		val, err := s.redis.Get(ctx, cacheKey).Result()
 		if err == nil {
 			var cachedResponse dto.MostSearchedResponse
 			if err := json.Unmarshal([]byte(val), &cachedResponse); err == nil {
@@ -578,7 +611,7 @@ func (s *NovelaService) GetMostSearched(ctx context.Context, limit int) (*dto.Mo
 
 	if s.redis != nil {
 		if data, err := json.Marshal(res); err == nil {
-			_ = s.redis.Set(ctx, "most_searched:", data, 15 * time.Minute).Err()
+			_ = s.redis.Set(ctx, cacheKey, data, 15 * time.Minute).Err()
 		}
 	}
 
