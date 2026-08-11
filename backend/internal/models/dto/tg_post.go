@@ -9,3 +9,9 @@ type TgPost struct {
 	ImageURLs []string  `json:"imageUrls"`
 	CreatedAt time.Time `json:"createdAt"`
 }
+
+type DeleteMessageResponse struct {
+	Ok          bool   `json:"ok"`
+	ErrorCode   int    `json:"error_code"`
+	Description string `json:"description"`
+}

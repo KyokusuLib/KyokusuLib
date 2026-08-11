@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lanxre/kyokusulib/internal/config"
 	"github.com/lanxre/kyokusulib/internal/models/db"
-	service "github.com/lanxre/kyokusulib/internal/services"
+	service "github.com/lanxre/kyokusulib/internal/services/tg"
 	"github.com/lanxre/kyokusulib/internal/sse"
 	"github.com/lanxre/kyokusulib/internal/utils/conv"
 	"github.com/lanxre/kyokusulib/internal/utils/files"
