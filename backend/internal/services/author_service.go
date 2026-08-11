@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"mime/multipart"
-	"regexp"
 	"strings"
 
+	"github.com/lanxre/kyokusulib/internal/constants"
 	"github.com/lanxre/kyokusulib/internal/models/db"
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
@@ -35,8 +35,8 @@ func (s *AuthorService) UploadAuthorImage(ctx context.Context, file multipart.Fi
 
 func (s *AuthorService) GetAuthorByName(ctx context.Context, name string) (*db.Author, error) {
 	name = strings.TrimSpace(name)
-	name = regexp.MustCompile(`[^\w\s-]`).ReplaceAllString(name, "")
-	name = regexp.MustCompile(`\s+`).ReplaceAllString(name, " ")
+	name = constants.AuthorNameCleanRegex.ReplaceAllString(name, "")
+	name = constants.AuthorNameSpaceRegex.ReplaceAllString(name, " ")
 	return s.repo.GetAuthorByName(ctx, name)
 }
 

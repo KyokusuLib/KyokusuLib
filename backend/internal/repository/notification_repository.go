@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lib/pq"
 )
 
 type NotificationRepository struct {
@@ -26,6 +27,33 @@ func (r *NotificationRepository) Create(ctx context.Context, n *db.Notification)
 		return nil, err
 	}
 	return n, nil
+}
+
+func (r *NotificationRepository) CreateBatch(ctx context.Context, userIDs []int64, title, message string) ([]*db.Notification, error) {
+	query := `
+		INSERT INTO notifications (user_id, title, message, is_read, created_at)
+		SELECT unnest($1::bigint[]), $2, $3, FALSE, NOW()
+		RETURNING id, user_id, created_at`
+	rows, err := r.DB.QueryContext(ctx, query, pq.Array(userIDs), title, message)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notifications := make([]*db.Notification, 0, len(userIDs))
+	for rows.Next() {
+		var n db.Notification
+		if err := rows.Scan(&n.ID, &n.UserID, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		n.Title = title
+		n.Message = message
+		notifications = append(notifications, &n)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return notifications, nil
 }
 
 func (r *NotificationRepository) GetByUserID(ctx context.Context, userID int64, limit, offset int) ([]*db.Notification, error) {

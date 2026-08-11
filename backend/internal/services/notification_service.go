@@ -43,6 +43,29 @@ func (s *NotificationService) Create(ctx context.Context, userID int64, title, m
 	return notification, nil
 }
 
+func (s *NotificationService) CreateBatch(ctx context.Context, userIDs []int64, title, message string) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	saved, err := s.Repo.CreateBatch(ctx, userIDs, title, message)
+	if err != nil {
+		return err
+	}
+
+	for _, n := range saved {
+		s.Hub.Publish(ctx, n.UserID, dto.Notification{
+			ID:        n.ID,
+			UserID:    n.UserID,
+			Title:     n.Title,
+			Message:   n.Message,
+			IsRead:    n.IsRead,
+			CreatedAt: n.CreatedAt,
+		})
+	}
+	return nil
+}
+
 func (s *NotificationService) GetByUserID(ctx context.Context, userID int64, params dto.QueryParams) ([]*dto.Notification, error) {
 	if params.Limit <= 0 || params.Limit > 100 {
 		params.Limit = 50

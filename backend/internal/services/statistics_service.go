@@ -46,7 +46,10 @@ func (s *NovelaStatisticsService) GetTotalStatistics(ctx context.Context, limit 
 		return nil, 0, err
 	}
 	result := s.mapTotalStatistics(statistics)
-	total := len(result)
+	total, err := s.statisticsRepo.CountNovelas(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	if s.redis != nil {
 		response := struct {
@@ -96,8 +99,6 @@ func (s *NovelaStatisticsService) GetGeneralStatistics(ctx context.Context, peri
 
 
 func (s *NovelaStatisticsService) GetMonthlyStatistics(ctx context.Context, limit int) ([]dto.NovelaMonthlySeries, error) {
-	rows, err := s.statisticsRepo.GetMonthlyNovelaSeries(ctx, limit)
-
 	cacheKey := fmt.Sprintf("monthly_novela_reading_stats:%d", limit)
 	if s.redis != nil {
 		val, err := s.redis.Get(ctx, cacheKey).Result()
@@ -108,7 +109,8 @@ func (s *NovelaStatisticsService) GetMonthlyStatistics(ctx context.Context, limi
 			}
 		}
 	}
-	
+
+	rows, err := s.statisticsRepo.GetMonthlyNovelaSeries(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
