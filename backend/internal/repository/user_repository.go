@@ -8,6 +8,7 @@ import (
 
 	"github.com/lanxre/kyokusulib/internal/constants"
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lib/pq"
 )
 
 type UserRepository struct {
@@ -554,6 +555,59 @@ func (r *UserRepository) GrantUserTag(ctx context.Context, userID int, tagID int
 	return err
 }
 
+type UpdateUserParams struct {
+	Name           string
+	About          string
+	Gender         string
+	Birthday       *time.Time
+	IsPublic       bool
+	Role           string
+	Status         string
+	IsShowTag      bool
+	IsShowBookmark bool
+}
+
+func (r *UserRepository) UpdateUser(ctx context.Context, userID int, p UpdateUserParams) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE users SET role = $1, status = $2, ispublic = $3 WHERE id = $4`,
+		p.Role, p.Status, p.IsPublic, userID,
+	); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO user_profiles (user_id, name, about, birthday, gender)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_id) DO UPDATE
+		SET name = EXCLUDED.name,
+		    about = EXCLUDED.about,
+		    birthday = EXCLUDED.birthday,
+		    gender = EXCLUDED.gender`,
+		userID, p.Name, p.About, p.Birthday, p.Gender,
+	); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO user_profile_settings (user_id, is_show_tag, is_show_bookmark)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO UPDATE
+		SET is_show_tag = EXCLUDED.is_show_tag,
+		    is_show_bookmark = EXCLUDED.is_show_bookmark`,
+		userID, p.IsShowTag, p.IsShowBookmark,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (r *UserRepository) GetReadChaptersCount(ctx context.Context, userID int) (int, error) {
 	query := `SELECT COUNT(*) FROM read_chapters WHERE user_id = $1`
 	var count int
@@ -562,21 +616,76 @@ func (r *UserRepository) GetReadChaptersCount(ctx context.Context, userID int) (
 }
 
 func (r *UserRepository) GetUserStats(ctx context.Context, userID int) (int, int, error) {
+	query := `
+		SELECT
+			(SELECT COUNT(*) FROM novela_comments WHERE user_id = $1),
+			(SELECT COUNT(*) FROM read_chapters WHERE user_id = $1)`
 	var totalComments, readChapters int
+	err := r.DB.QueryRowContext(ctx, query, userID).Scan(&totalComments, &readChapters)
+	return totalComments, readChapters, err
+}
 
-	commentsQuery := `SELECT COUNT(*) FROM novela_comments WHERE user_id = $1`
-	err := r.DB.QueryRowContext(ctx, commentsQuery, userID).Scan(&totalComments)
-	if err != nil {
-		return 0, 0, err
+func (r *UserRepository) GetUserStatsBatch(ctx context.Context, userIDs []int) (map[int]db.UserStats, error) {
+	result := make(map[int]db.UserStats, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
 	}
 
-	readChaptersQuery := `SELECT COUNT(*) FROM read_chapters WHERE user_id = $1`
-	err = r.DB.QueryRowContext(ctx, readChaptersQuery, userID).Scan(&readChapters)
+	query := `
+		SELECT
+			u.id,
+			(SELECT COUNT(*) FROM novela_comments nc WHERE nc.user_id = u.id),
+			(SELECT COUNT(*) FROM read_chapters rc WHERE rc.user_id = u.id)
+		FROM users u
+		WHERE u.id = ANY($1)`
+
+	rows, err := r.DB.QueryContext(ctx, query, pq.Array(userIDs))
 	if err != nil {
-		return 0, 0, err
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var stats db.UserStats
+		if err := rows.Scan(&id, &stats.TotalComments, &stats.ReadChapters); err != nil {
+			return nil, err
+		}
+		result[id] = stats
 	}
 
-	return totalComments, readChapters, nil
+	return result, rows.Err()
+}
+
+func (r *UserRepository) GetUserTagsBatch(ctx context.Context, userIDs []int) (map[int][]*db.UserTag, error) {
+	result := make(map[int][]*db.UserTag, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT uut.user_id, ut.id, ut.tag
+		FROM users_user_tags uut
+		JOIN user_tags ut ON ut.id = uut.tag_id
+		WHERE uut.user_id = ANY($1)
+		ORDER BY ut.tag`
+
+	rows, err := r.DB.QueryContext(ctx, query, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID int
+		var t db.UserTag
+		if err := rows.Scan(&userID, &t.TagID, &t.Tag); err != nil {
+			return nil, err
+		}
+		result[userID] = append(result[userID], &t)
+	}
+
+	return result, rows.Err()
 }
 
 func (r *UserRepository) IsExist(ctx context.Context, userID int) (bool, error) {

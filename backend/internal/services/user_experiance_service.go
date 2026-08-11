@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"github.com/lanxre/kyokusulib/internal/models/db"
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
@@ -32,6 +33,13 @@ func (s *UserExperienceService) GetLevelDefinitions (ctx context.Context) ([]dto
 }
 
 func (s *UserExperienceService) UpdateUserLevel(ctx context.Context, dto dto.UpdateUserLevel) error {
+	if dto.Level < 1 {
+		return errors.New("invalid level")
+	}
+	if dto.Experience < 0 {
+		return errors.New("invalid experience")
+	}
+
 	return s.UserExpRepo.UpdateUserLevel(
 		ctx,
 		dto.UserID,

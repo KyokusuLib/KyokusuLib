@@ -120,6 +120,43 @@ func (h *UserHandler) UpdateUserStatus(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusOK, "User status was updated: "+time.Now().Format("02-01-2006"))
 }
 
+func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	moderatorId, _ := r.Context().Value(middleware.UserIDKey).(int)
+	userID, _ := strconv.Atoi(mux.Vars(r)["userId"])
+
+	var req dto.UpdateUserDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Validation error: "+err.Error())
+		return
+	}
+
+	if err := h.UserService.UpdateUser(r.Context(), userID, req); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	activityMetaData, _ := json.Marshal(map[string]any{
+		"user_id": moderatorId,
+		"title":   "Произведено обновление данных аккаунта пользователя",
+		"time":    time.Now().Format("02-01-2006"),
+	})
+
+	h.ActivityService.CreateUserActivity(r.Context(), moderatorId, &dto.CreateUserActivity{
+		ActivityType: "update_account",
+		TargetID:     userID,
+		Metadata:     activityMetaData,
+	})
+
+	h.NotificationService.Create(r.Context(), int64(moderatorId), "Обновление данных аккаунта", fmt.Sprintf("Обновил данные аккаунта пользователя: %d", userID))
+
+	response.Success(w, http.StatusOK, "User was updated: "+time.Now().Format("02-01-2006"))
+}
+
 func (h *UserHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok {
