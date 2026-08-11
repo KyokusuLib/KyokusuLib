@@ -102,7 +102,7 @@ export function useUserEdit() {
 
   async function save(userId: number): Promise<boolean> {
     try {
-      await updateUser(userId, {
+      const ok = await updateUser(userId, {
         name: form.name,
         about: form.about,
         gender: form.gender,
@@ -110,13 +110,19 @@ export function useUserEdit() {
         is_public: form.isPublic,
         is_show_tag: form.isShowTag,
         is_show_bookmark: form.isShowBookmark,
+        role: form.role,
+        status: form.status,
       })
 
-      notify({
-        title: 'Успех',
-        content: 'Пользователь обновлён',
-        type: 'success',
-      })
+      if (!ok) {
+        notify({
+          title: 'Ошибка',
+          content: 'Не удалось обновить пользователя',
+          type: 'error',
+        })
+        return false
+      }
+
       return true
     } catch (e: any) {
       notify({

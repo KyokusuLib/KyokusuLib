@@ -12,6 +12,7 @@ import DashboardUserTagsEdit from './DashboardUserTagsEdit.vue'
 
 import { useUserEdit } from '@/composables/api/dashboard/useUserEdit'
 import { useUserTag } from '@/composables/api/profile/useUserTag'
+import { useUserExperiance } from '@/composables/api/user/useUserExperiance'
 import { useRolePermissions } from '@/composables/api/role/useRolePermissions'
 import { KyokusuAppRole } from '~/types/enums/role-enum'
 
@@ -32,19 +33,36 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val),
 })
 
-const { form, loadUser } = useUserEdit()
+const { form, loadUser, save } = useUserEdit()
 const { hasPermission } = useRolePermissions()
 const { updateUserTags } = useUserTag()
+const { updateLevel } = useUserExperiance()
 
 const userLevel = ref(1)
 const userExperience = ref(0)
 const userTags = ref<DashboardUser['tags']>([])
 
 let suppressTagSave = false
+let suppressFormSave = false
+let suppressLevelSave = false
 
 const debouncedSaveTags = useDebounceFn(async (userId: number) => {
   const tagIds = userTags.value.map((t) => t.tag_id)
   const ok = await updateUserTags(userId, tagIds)
+  if (ok) {
+    emit('saved')
+  }
+}, 800)
+
+const debouncedSaveForm = useDebounceFn(async (userId: number) => {
+  const ok = await save(userId)
+  if (ok) {
+    emit('saved')
+  }
+}, 800)
+
+const debouncedSaveLevel = useDebounceFn(async (userId: number) => {
+  const ok = await updateLevel(userId, userLevel.value, userExperience.value)
   if (ok) {
     emit('saved')
   }
@@ -57,17 +75,51 @@ watch(userTags, () => {
 })
 
 watch(
+  () => ({
+    name: form.name,
+    about: form.about,
+    gender: form.gender,
+    birthday: form.birthday,
+    isPublic: form.isPublic,
+    role: form.role,
+    status: form.status,
+    isShowTag: form.isShowTag,
+    isShowBookmark: form.isShowBookmark,
+  }),
+  () => {
+    if (suppressFormSave) return
+    if (!props.user) return
+    debouncedSaveForm(props.user.id)
+  },
+)
+
+watch([userLevel, userExperience], () => {
+  if (suppressLevelSave) return
+  if (!props.user) return
+  debouncedSaveLevel(props.user.id)
+})
+
+watch(
   () => props.user,
   (u) => {
     if (!u) return
 
+    debouncedSaveForm.cancel()
+    debouncedSaveLevel.cancel()
+    debouncedSaveTags.cancel()
+
+    suppressFormSave = true
+    suppressLevelSave = true
+    suppressTagSave = true
+
     loadUser(u)
     userLevel.value = u.user_level?.level ?? 1
     userExperience.value = u.user_level?.experience ?? 0
-
-    suppressTagSave = true
     userTags.value = [...(u.tags ?? [])]
+
     void nextTick(() => {
+      suppressFormSave = false
+      suppressLevelSave = false
       suppressTagSave = false
     })
   },
