@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lib/pq"
 )
 
 type NovelaBookmarkRepository struct {
@@ -72,6 +73,54 @@ func (r *NovelaBookmarkRepository) GetBookmarkStats(tx *sql.Tx, ctx context.Cont
 	}
 
 	return &summary, nil
+}
+
+func (r *NovelaBookmarkRepository) GetBookmarkStatsBatch(tx *sql.Tx, ctx context.Context, novelaIDs []int) (map[int]*db.NovelaBookmarkSummary, error) {
+	result := make(map[int]*db.NovelaBookmarkSummary, len(novelaIDs))
+	if len(novelaIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			s.novela_id,
+			COALESCE(SUM(s.count), 0) as total_count,
+			COALESCE(jsonb_object_agg(c.name, s.count), '{}'::jsonb)
+		FROM (
+			SELECT novela_id, category_id, COUNT(*) as count
+			FROM user_novela_bookmarks
+			WHERE novela_id = ANY($1)
+			GROUP BY novela_id, category_id
+		) s
+		JOIN bookmark_categories c ON s.category_id = c.id
+		GROUP BY s.novela_id`
+
+	rows, err := tx.QueryContext(ctx, query, pq.Array(novelaIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var novelaID int
+		var summary db.NovelaBookmarkSummary
+		var distJSON []byte
+		var totalCount int
+
+		if err := rows.Scan(&novelaID, &totalCount, &distJSON); err != nil {
+			return nil, err
+		}
+
+		summary.TotalCount = totalCount
+		summary.Distribution = make(map[string]int)
+		if len(distJSON) > 0 {
+			json.Unmarshal(distJSON, &summary.Distribution)
+		}
+
+		result[novelaID] = &summary
+	}
+
+	return result, rows.Err()
 }
 
 func (r *NovelaBookmarkRepository) GetCategoryByName(ctx context.Context, userID int, name string) (int, error) {

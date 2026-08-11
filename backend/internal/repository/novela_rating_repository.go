@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lib/pq"
 )
 
 type NovelaRatingRepository struct {
@@ -62,4 +63,53 @@ func (r *NovelaRatingRepository) GetRating(tx *sql.Tx, ctx context.Context, nove
 	}
 
 	return &summary, nil
+}
+
+func (r *NovelaRatingRepository) GetRatingsBatch(tx *sql.Tx, ctx context.Context, novelaIDs []int) (map[int]*db.NovelaRatingSummary, error) {
+	result := make(map[int]*db.NovelaRatingSummary, len(novelaIDs))
+	if len(novelaIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			novela_id,
+		    SUM(count) AS total_count,
+		    COALESCE(SUM(q)::numeric / NULLIF(SUM(count), 0), 0) AS avg_rating,
+		    jsonb_object_agg(rating, count) AS distribution
+		FROM (
+		    SELECT
+		        novela_id,
+		        rating,
+		        COUNT(*) AS count,
+		        (COUNT(*) * rating) AS q
+		    FROM novela_ratings
+		    WHERE novela_id = ANY($1)
+		    GROUP BY novela_id, rating
+		) AS s
+		GROUP BY novela_id`
+
+	rows, err := tx.QueryContext(ctx, query, pq.Array(novelaIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var novelaID int
+		var summary db.NovelaRatingSummary
+		var distJSON []byte
+
+		if err := rows.Scan(&novelaID, &summary.TotalCount, &summary.AverageRating, &distJSON); err != nil {
+			return nil, err
+		}
+
+		if len(distJSON) > 0 {
+			json.Unmarshal(distJSON, &summary.Distribution)
+		}
+
+		result[novelaID] = &summary
+	}
+
+	return result, rows.Err()
 }

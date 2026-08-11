@@ -539,7 +539,7 @@ func (r *NovelaRepository) GetIDByTitle(ctx context.Context, title string) (int,
 }
 
 func (r *NovelaRepository) GetNovelas(tx *sql.Tx, ctx context.Context, userID int, f dto.NovelaFilters) ([]db.Novela, int, error) {
-	var args []interface{}
+	var args []any
 	where := []string{"$1::int IS NOT NULL"}
 	argID := 1
 
@@ -789,6 +789,24 @@ func (r *NovelaRepository) AddChapterImage(ctx context.Context, chapterID string
 	var id int
 	err := r.DB.QueryRowContext(ctx, query, chapterID, imageURL, caption, position).Scan(&id)
 	return id, err
+}
+
+func (r *NovelaRepository) AddChapterImages(ctx context.Context, chapterID string, images []dto.AddChapterImageRequest) error {
+	if len(images) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO novela_chapter_images (chapter_id, image_url, caption, position) VALUES `
+
+	values := make([]string, 0, len(images))
+	args := make([]any, 0, len(images)*4)
+	for i, img := range images {
+		values = append(values, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
+		args = append(args, chapterID, img.ImageURL, img.Caption, img.Position)
+	}
+
+	_, err := r.DB.ExecContext(ctx, query+strings.Join(values, ", "), args...)
+	return err
 }
 
 func (r *NovelaRepository) UpdateChapter(ctx context.Context, chapterID string, chapterNumber float64, title, content string) error {
