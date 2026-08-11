@@ -1,16 +1,10 @@
-import { useApi } from '@/composables/api/useApi'
+import { $api } from '@/composables/api/useApi'
 import type { UserTagDefinitions } from '@/types/backend/user'
 
 export function useUserTags() {
   const getDefinitions = async (): Promise<UserTagDefinitions | null> => {
     try {
-      const { data, error } = await useApi<UserTagDefinitions>(`/api/user/tags`)
-
-      if (error.value) {
-        return null
-      }
-
-      return data.value!
+      return await $api<UserTagDefinitions>(`/user/tags`)
     } catch {
       return null
     }
