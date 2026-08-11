@@ -1,9 +1,21 @@
-import { useApi, $api } from '~/composables/api/useApi'
+import { $api } from '~/composables/api/useApi'
 import { useRolePermissions } from '../role/useRolePermissions'
 
 import type { GetUserDto } from '@/types/backend/user'
 import type { DashboardRowUserStatus } from '~/types/enums/dashboard-table'
 import { KyokusuAppRole } from '~/types/enums/role-enum'
+
+export interface UpdateUserPayload {
+  name: string
+  about: string
+  gender: string
+  birthday: string
+  is_public: boolean
+  is_show_tag: boolean
+  is_show_bookmark: boolean
+  role: string
+  status: string
+}
 
 export function useUserApi() {
   const { hasPermission } = useRolePermissions()
@@ -13,16 +25,23 @@ export function useUserApi() {
     if (!userId) return null
 
     try {
-      const { data, error } = await useApi<GetUserDto>(`/api/user/${userId}`)
-
-      if (error.value) {
-        console.error('USER FETCHER ERROR:', error.value)
-        return null
-      }
-      return data.value!
+      return await $api<GetUserDto>(`/user/${userId}`)
     } catch (e) {
-      console.error('USER FETCHER EXCEPTION:', e)
+      console.error('USER FETCHER ERROR:', e)
       return null
+    }
+  }
+
+  const updateUser = async (userId: number, payload: UpdateUserPayload): Promise<boolean> => {
+    try {
+      await $api(`/user/${userId}`, {
+        method: 'PUT',
+        body: payload,
+      })
+      return true
+    } catch (e) {
+      console.error('USER UPDATE ERROR:', e)
+      return false
     }
   }
 
@@ -90,6 +109,7 @@ export function useUserApi() {
 
   return {
     getUser,
+    updateUser,
     deleteUser,
     updateUserStatus,
   }

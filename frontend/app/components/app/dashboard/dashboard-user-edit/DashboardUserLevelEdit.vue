@@ -56,19 +56,21 @@ const defs = computed(() => definitions.value ?? [])
 
 const currentDef = computed(() => defs.value.find((d) => d.level === selectedLevel.value))
 
-const maxXp = computed(() => currentDef.value?.total_xp_required ?? 0)
-
-watch(selectedLevel, () => {
-  if (selectedExperience.value > maxXp.value) {
-    selectedExperience.value = maxXp.value
-  }
-})
-
 const currentDefIndex = computed(() => defs.value.findIndex((d) => d.level === selectedLevel.value))
 
 const nextDef = computed(() => {
   const i = currentDefIndex.value
   return i >= 0 && i < defs.value.length - 1 ? defs.value[i + 1] : null
+})
+
+const maxXp = computed(
+  () => nextDef.value?.total_xp_required ?? currentDef.value?.total_xp_required ?? 0,
+)
+
+watch(selectedLevel, () => {
+  if (selectedExperience.value > maxXp.value) {
+    selectedExperience.value = maxXp.value
+  }
 })
 </script>
 
@@ -134,7 +136,8 @@ const nextDef = computed(() => {
         Титул: <strong>{{ currentDef.title }}</strong>
       </span>
       <span v-if="nextDef" class="font-semibold">
-        До уровня {{ nextDef.level }}: <strong>{{ maxXp - selectedExperience }} XP</strong>
+        До уровня {{ nextDef.level }}:
+        <strong>{{ Math.max(maxXp - selectedExperience, 0) }} XP</strong>
       </span>
       <span v-else-if="currentDef" class="font-semibold"> Максимальный уровень </span>
     </div>
