@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	rhModels "github.com/lanxre/kyokusulib/internal/parse/models/ranobehub"
 	service "github.com/lanxre/kyokusulib/internal/services"
+	"golang.org/x/sync/errgroup"
 )
 
 type RanobeHubParseService struct {
@@ -67,56 +69,64 @@ func (s *RanobeHubParseService) Parse(ctx context.Context, rhNovela *rhModels.Ra
 		}
 		err = s.NovelaService.Repo.LinkAuthor(ctx, novela.ID, name, "Author")
 		if err != nil {
-			fmt.Printf("failed to link author %s: %v\n", name, err)
+			slog.Error("failed to link author", "name", name, "error", err)
 		}
 	}
 
+	g := new(errgroup.Group)
 	for _, vol := range rhNovela.Volumes {
-		volumeNumber := int(vol.Num)
-		volID, err := s.NovelaService.Repo.GetVolumeIDByNumber(ctx, novela.ID, volumeNumber)
+		g.Go(func() error {
+			return s.importVolume(ctx, novela.ID, userID, vol)
+		})
+	}
+	return g.Wait()
+}
+
+func (s *RanobeHubParseService) importVolume(ctx context.Context, novelaID, userID int, vol rhModels.RanobeHubNovelaVolume) error {
+	volumeNumber := int(vol.Num)
+	volID, err := s.NovelaService.Repo.GetVolumeIDByNumber(ctx, novelaID, volumeNumber)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			volID, _, err = s.NovelaService.AddVolume(ctx, novelaID, userID, dto.AddVolumeRequest{
+				VolumeNumber: volumeNumber,
+				Title:        vol.Name,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to add volume %f: %w", vol.Num, err)
+			}
+		} else {
+			return fmt.Errorf("failed to check volume existence: %w", err)
+		}
+	}
+
+	for _, ch := range vol.Chapters {
+		chapterID, err := s.NovelaService.Repo.GetChapterIDByNumber(ctx, volID, ch.Num)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				volID, _, err = s.NovelaService.AddVolume(ctx, novela.ID, userID, dto.AddVolumeRequest{
-					VolumeNumber: volumeNumber,
-					Title:        vol.Name,
+				chapterID, _, err = s.NovelaService.AddChapter(ctx, volID, userID, dto.AddChapterRequest{
+					ChapterNumber: ch.Num,
+					Title:         ch.Name,
+					Content:       ch.Text,
 				})
 				if err != nil {
-					return fmt.Errorf("failed to add volume %f: %w", vol.Num, err)
+					return fmt.Errorf("failed to add chapter %f in volume %f: %w", ch.Num, vol.Num, err)
+				}
+
+				images := make([]dto.AddChapterImageRequest, len(ch.Images))
+				for imgIdx, imgURL := range ch.Images {
+					images[imgIdx] = dto.AddChapterImageRequest{
+						ImageURL: imgURL,
+						Position: imgIdx,
+					}
+				}
+				if err := s.NovelaService.AddChapterImages(ctx, chapterID, images); err != nil {
+					slog.Error("failed to add chapter images", "chapter_id", chapterID, "error", err)
 				}
 			} else {
-				return fmt.Errorf("failed to check volume existence: %w", err)
-			}
-		}
-
-		for _, ch := range vol.Chapters {
-			chapterID, err := s.NovelaService.Repo.GetChapterIDByNumber(ctx, volID, ch.Num)
-			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					chapterID, _, err = s.NovelaService.AddChapter(ctx, volID, userID, dto.AddChapterRequest{
-						ChapterNumber: ch.Num,
-						Title:         ch.Name,
-						Content:       ch.Text,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to add chapter %f in volume %f: %w", ch.Num, vol.Num, err)
-					}
-
-					for imgIdx, imgURL := range ch.Images {
-						_, imgErr := s.NovelaService.AddChapterImage(ctx, chapterID, dto.AddChapterImageRequest{
-							ImageURL: imgURL,
-							Position: imgIdx,
-						})
-						if imgErr != nil {
-							fmt.Printf("failed to add chapter image %d for chapter %s: %v\n", imgIdx, chapterID, imgErr)
-						}
-					}
-				} else {
-					return fmt.Errorf("failed to check chapter existence: %w", err)
-				}
+				return fmt.Errorf("failed to check chapter existence: %w", err)
 			}
 		}
 	}
-
 	return nil
 }
 
