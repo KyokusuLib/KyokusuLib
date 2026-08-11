@@ -1,17 +1,10 @@
-package service
+package tg
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"time"
+	"errors"
 
-	"github.com/lanxre/kyokusulib/internal/config"
+	"github.com/lanxre/kyokusulib/internal/apperrors"
 	"github.com/lanxre/kyokusulib/internal/models/db"
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
@@ -19,17 +12,14 @@ import (
 	"github.com/lanxre/kyokusulib/internal/utils/files"
 )
 
-const tgDeleteTimeout = 10 * time.Second
-
 type TgPostService struct {
 	Repo *repository.TgPostRepository
 	Hub  *sse.TgPostsHub
-	cfg  *config.Config
-	log  *slog.Logger
+	Bot  *TgBotAPI
 }
 
-func NewTgPostService(repo *repository.TgPostRepository, hub *sse.TgPostsHub, cfg *config.Config, log *slog.Logger) *TgPostService {
-	return &TgPostService{Repo: repo, Hub: hub, cfg: cfg, log: log}
+func NewTgPostService(repo *repository.TgPostRepository, hub *sse.TgPostsHub, botApi *TgBotAPI) *TgPostService {
+	return &TgPostService{Repo: repo, Hub: hub, Bot: botApi}
 }
 
 func (s *TgPostService) Create(ctx context.Context, post *db.TgPost) (*dto.TgPost, error) {
@@ -71,6 +61,10 @@ func (s *TgPostService) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
+	if err := s.Bot.DeleteFromTelegram(ctx, post.MessageID); err != nil && !errors.Is(err, apperrors.ErrTelegramDeletePermanent) {
+		return err
+	}
+
 	for _, img := range post.Images {
 		if err := files.DeleteImage(img.ImagePath); err != nil {
 			return err
@@ -82,7 +76,6 @@ func (s *TgPostService) Delete(ctx context.Context, id int64) error {
 	}
 
 	s.Hub.PublishDelete(ctx, id)
-	s.deleteFromTelegram(post.MessageID)
 	return nil
 }
 
@@ -97,59 +90,6 @@ func (s *TgPostService) GetSinceID(ctx context.Context, lastID int64, limit int)
 		result = append(result, toTgPostDTO(p))
 	}
 	return result, nil
-}
-
-func (s *TgPostService) deleteFromTelegram(messageID int64) {
-	if s.cfg.TgBotToken == "" || s.cfg.TgChannelUsername == "" {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), tgDeleteTimeout)
-	defer cancel()
-
-	endpoint := fmt.Sprintf(
-		"https://api.telegram.org/bot%s/deleteMessage",
-		s.cfg.TgBotToken,
-	)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(
-		url.Values{
-			"chat_id":    {"@" + s.cfg.TgChannelUsername},
-			"message_id": {strconv.FormatInt(messageID, 10)},
-		}.Encode(),
-	))
-	if err != nil {
-		s.log.Warn(
-			"failed to build telegram delete request",
-			slog.Int64("message_id", messageID),
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		s.log.Warn(
-			"failed to delete telegram post",
-			slog.Int64("message_id", messageID),
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-
-		s.log.Warn(
-			"telegram rejected delete request",
-			slog.Int64("message_id", messageID),
-			slog.Int("status", resp.StatusCode),
-			slog.String("body", string(body)),
-		)
-	}
 }
 
 func toTgPostDTO(p *db.TgPost) *dto.TgPost {
