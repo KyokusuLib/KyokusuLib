@@ -124,19 +124,14 @@ func (h *NotificationHub) publishToLocalClients(
 	notification dto.Notification,
 ) {
 	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	clients, ok := h.clients[userID]
 	if !ok {
-		h.mu.RUnlock()
 		return
 	}
 
-	snapshot := make([]Client, 0, len(clients))
 	for client := range clients {
-		snapshot = append(snapshot, client)
-	}
-	h.mu.RUnlock()
-
-	for _, client := range snapshot {
 		select {
 		case client <- notification:
 		default:
