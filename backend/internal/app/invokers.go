@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/lanxre/kyokusulib/internal/config"
@@ -80,10 +81,12 @@ func StartHTTPServer(lc fx.Lifecycle, r *mux.Router, cfg *config.Config) {
 	handler := c.Handler(r)
 
 	srv := &http.Server{
-		Handler:      handler,
-		Addr:         cfg.Address,
-		WriteTimeout: cfg.WriteTimeout,
-		ReadTimeout:  cfg.ReadTimeout,
+		Handler:           handler,
+		Addr:              cfg.Address,
+		WriteTimeout:      cfg.WriteTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	lc.Append(fx.Hook{
