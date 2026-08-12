@@ -5,3 +5,7 @@
 [submodule "apps/kyokusu-tg-bot"]
 	path = apps/kyokusu-tg-bot
 	url = git@github.com:KyokusuLib/kyokusu-tg-bot.git
+
+[submodule "cli"]
+	path = cli
+	url = git@github.com:KyokusuLib/kyokusu-cli.git
