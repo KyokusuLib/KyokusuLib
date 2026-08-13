@@ -2,6 +2,11 @@
 
 Платформа для чтения ранобэ и манги. SSR-фронтенд на Nuxt (Bun), REST API на Go, PostgreSQL.
 
+<p align="center">
+    <img src="./frontend/app/assets/images/Kyokusu/maskot-transparent.png" alt="Screenshot">
+</p>
+
+
 ---
 
 ## Стек

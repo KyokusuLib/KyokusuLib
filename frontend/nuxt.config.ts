@@ -6,7 +6,9 @@ export default defineNuxtConfig({
       title: 'KyokusuLib',
       charset: 'utf-8',
       viewport: 'width=device-width, initial-scale=1',
-      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/images/KLibIcon.svg' }],
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/images/kyokusulib_logo_3.png' },
+      ],
     },
   },
   devtools: { enabled: true },
