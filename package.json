@@ -9,8 +9,9 @@
     "frontend": "cd frontend && bun run dev",
     "ranobehub": "cd apps/ranobehub-parser && bun run index",
     "tg-bot": "cd apps/kyokusu-tg-bot && bun run start",
-    "cli-build": "cd cli && go build -o kyokusu-cli",
-    "cli": "bun run cli-build && ./cli/kyokusu-cli"
+    "cli-build": "cd cli && go build -o ../kyokusu-cli",
+    "cli": "bun run cli-build && ./kyokusu-cli",
+    "backup": "bun run cli-build && ./kyokusu-cli dmp postgres -env ./backend/.env"
   },
   "devDependencies": {
     "@types/bun": "latest"
