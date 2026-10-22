@@ -19,11 +19,11 @@ import (
 )
 
 type SocialNetworkHandler struct {
-	Service *service.SocialsService
-	OAuthConfigGoogle *oauth2.Config
+	Service            *service.SocialsService
+	OAuthConfigGoogle  *oauth2.Config
 	OAuthConfigDiscord *oauth2.Config
-	StateString string
-	FrontendURL string
+	FrontendURL        string
+	CookieSecure       bool
 }
 
 func NewSocialNetworkHandler(cfg *config.Config, service *service.SocialsService) *SocialNetworkHandler {
@@ -49,8 +49,8 @@ func NewSocialNetworkHandler(cfg *config.Config, service *service.SocialsService
 				TokenURL: "https://discord.com/api/oauth2/token",
 			},
 		},
-		StateString: cfg.StateString,
-		FrontendURL: cfg.FrontendURL,
+		FrontendURL:  cfg.FrontendURL,
+		CookieSecure: cfg.CookieSecure,
 	}
 }
 
@@ -60,7 +60,7 @@ func (h *SocialNetworkHandler) GetSocials(w http.ResponseWriter, r *http.Request
 		http.Error(w, "User not found in context", http.StatusInternalServerError)
 		return
 	}
-	
+
 	socials, err := h.Service.GetUserSocials(r.Context(), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -72,12 +72,17 @@ func (h *SocialNetworkHandler) GetSocials(w http.ResponseWriter, r *http.Request
 }
 
 func (h *SocialNetworkHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := h.OAuthConfigGoogle.AuthCodeURL(h.StateString, 
-		oauth2.AccessTypeOffline, 
+	state, err := newOAuthState(w, h.CookieSecure)
+	if err != nil {
+		http.Error(w, "Failed to generate OAuth state", http.StatusInternalServerError)
+		return
+	}
+
+	url := h.OAuthConfigGoogle.AuthCodeURL(state,
+		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("prompt", "consent"),
 	)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-	
 }
 
 func (h *SocialNetworkHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
@@ -88,10 +93,12 @@ func (h *SocialNetworkHandler) GoogleCallback(w http.ResponseWriter, r *http.Req
 	}
 
 	state := r.FormValue("state")
-	if state != h.StateString {
+	if !validOAuthState(r, state) {
+		clearOAuthState(w, h.CookieSecure)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
+	clearOAuthState(w, h.CookieSecure)
 
 	code := r.FormValue("code")
 	token, err := h.OAuthConfigGoogle.Exchange(context.Background(), code)
@@ -99,7 +106,7 @@ func (h *SocialNetworkHandler) GoogleCallback(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Code exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	client := h.OAuthConfigGoogle.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
@@ -116,7 +123,7 @@ func (h *SocialNetworkHandler) GoogleCallback(w http.ResponseWriter, r *http.Req
 	}
 
 	userDTO := &dto.UserDTO{
-		Id: 	  user.ID,
+		Id:       user.ID,
 		Email:    user.Email,
 		Username: user.Name,
 		Avatar:   user.Picture,
@@ -126,7 +133,13 @@ func (h *SocialNetworkHandler) GoogleCallback(w http.ResponseWriter, r *http.Req
 }
 
 func (h *SocialNetworkHandler) DiscordLogin(w http.ResponseWriter, r *http.Request) {
-	url := h.OAuthConfigDiscord.AuthCodeURL(h.StateString, oauth2.AccessTypeOffline)
+	state, err := newOAuthState(w, h.CookieSecure)
+	if err != nil {
+		http.Error(w, "Failed to generate OAuth state", http.StatusInternalServerError)
+		return
+	}
+
+	url := h.OAuthConfigDiscord.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -137,10 +150,12 @@ func (h *SocialNetworkHandler) DiscordCallback(w http.ResponseWriter, r *http.Re
 		return
 	}
 	state := r.FormValue("state")
-	if state != h.StateString {
+	if !validOAuthState(r, state) {
+		clearOAuthState(w, h.CookieSecure)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
+	clearOAuthState(w, h.CookieSecure)
 
 	code := r.FormValue("code")
 	if code == "" {
@@ -153,7 +168,7 @@ func (h *SocialNetworkHandler) DiscordCallback(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Code exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	client := h.OAuthConfigDiscord.Client(context.Background(), token)
 	resp, err := client.Get("https://discord.com/api/users/@me")
 	if err != nil {
@@ -181,7 +196,7 @@ func (h *SocialNetworkHandler) DiscordCallback(w http.ResponseWriter, r *http.Re
 	}
 
 	userDTO := &dto.UserDTO{
-		Id: 	  dUser.ID,
+		Id:       dUser.ID,
 		Email:    dUser.Email,
 		Username: displayName,
 		Avatar:   avatarURL,
@@ -237,11 +252,11 @@ func (h *SocialNetworkHandler) UnlinkDiscord(w http.ResponseWriter, r *http.Requ
 		data := url.Values{}
 		data.Set("token", socials.DiscordRefreshToken)
 		data.Set("token_type_hint", "refresh_token")
-		
+
 		req, _ := http.NewRequest("POST", "https://discord.com/api/oauth2/token/revoke", strings.NewReader(data.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.SetBasicAuth(h.OAuthConfigDiscord.ClientID, h.OAuthConfigDiscord.ClientSecret)
-		
+
 		client := &http.Client{}
 		client.Do(req)
 	}
@@ -263,7 +278,5 @@ func (h *SocialNetworkHandler) completeOAuth(w http.ResponseWriter, r *http.Requ
 	}
 
 	h.Service.LinkAccount(r.Context(), userID, provider, userDTO.Id, refreshToken)
-	http.Redirect(w, r, h.FrontendURL + "/profile/settings", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, h.FrontendURL+"/profile/settings", http.StatusTemporaryRedirect)
 }
-
-

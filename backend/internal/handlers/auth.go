@@ -25,16 +25,16 @@ type AuthHandler struct {
 	AuthService        *service.AuthService
 	UserService        *service.UserService
 	EmailService       *service.EmailService
-	SocialService	   *service.SocialsService
+	SocialService      *service.SocialsService
 
-	JWTSecret   string
-	FrontendURL string
-	BackendURL  string
-	StateString string
+	JWTSecret    string
+	FrontendURL  string
+	BackendURL   string
+	CookieSecure bool
 }
 
-func NewAuthHandler(cfg *config.Config, 
-	authService *service.AuthService, 
+func NewAuthHandler(cfg *config.Config,
+	authService *service.AuthService,
 	userService *service.UserService,
 	emailService *service.EmailService,
 	socialService *service.SocialsService,
@@ -60,21 +60,52 @@ func NewAuthHandler(cfg *config.Config,
 				TokenURL: "https://discord.com/api/oauth2/token",
 			},
 		},
-		AuthService:  authService,
-		EmailService: emailService,
+		AuthService:   authService,
+		EmailService:  emailService,
 		SocialService: socialService,
-		UserService: userService,
+		UserService:   userService,
 
-		JWTSecret:   cfg.JWTSecret,
-		FrontendURL: cfg.FrontendURL,
-		BackendURL:  cfg.BackendURL,
-		StateString: cfg.StateString,
+		JWTSecret:    cfg.JWTSecret,
+		FrontendURL:  cfg.FrontendURL,
+		BackendURL:   cfg.BackendURL,
+		CookieSecure: cfg.CookieSecure,
+	}
+}
+
+func (h *AuthHandler) newAuthCookie(value string) *http.Cookie {
+	return &http.Cookie{
+		Name:     "KYOKUSU_API_TOKEN",
+		Value:    value,
+		Path:     "/",
+		Expires:  time.Now().AddDate(0, 1, 0),
+		HttpOnly: true,
+		Secure:   h.CookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+func (h *AuthHandler) newLogoutCookie() *http.Cookie {
+	return &http.Cookie{
+		Name:     "KYOKUSU_API_TOKEN",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   h.CookieSecure,
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
 func (h *AuthHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := h.OAuthConfigGoogle.AuthCodeURL(h.StateString, 
-		oauth2.AccessTypeOffline, 
+	state, err := newOAuthState(w, h.CookieSecure)
+	if err != nil {
+		http.Error(w, "Failed to generate OAuth state", http.StatusInternalServerError)
+		return
+	}
+
+	url := h.OAuthConfigGoogle.AuthCodeURL(state,
+		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("prompt", "consent"),
 	)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
@@ -82,10 +113,12 @@ func (h *AuthHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.FormValue("state")
-	if state != h.StateString {
+	if !validOAuthState(r, state) {
+		clearOAuthState(w, h.CookieSecure)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
+	clearOAuthState(w, h.CookieSecure)
 
 	code := r.FormValue("code")
 	token, err := h.OAuthConfigGoogle.Exchange(context.Background(), code)
@@ -93,7 +126,7 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Code exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	client := h.OAuthConfigGoogle.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
@@ -110,7 +143,7 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userDTO := &dto.UserDTO{
-		Id: 	  user.ID,
+		Id:       user.ID,
 		Email:    user.Email,
 		Username: user.Name,
 		Avatar:   user.Picture,
@@ -121,16 +154,24 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) DiscordLogin(w http.ResponseWriter, r *http.Request) {
-	url := h.OAuthConfigDiscord.AuthCodeURL(h.StateString, oauth2.AccessTypeOffline)
+	state, err := newOAuthState(w, h.CookieSecure)
+	if err != nil {
+		http.Error(w, "Failed to generate OAuth state", http.StatusInternalServerError)
+		return
+	}
+
+	url := h.OAuthConfigDiscord.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) DiscordCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.FormValue("state")
-	if state != h.StateString {
+	if !validOAuthState(r, state) {
+		clearOAuthState(w, h.CookieSecure)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
+	clearOAuthState(w, h.CookieSecure)
 
 	code := r.FormValue("code")
 	if code == "" {
@@ -171,7 +212,7 @@ func (h *AuthHandler) DiscordCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userDTO := &dto.UserDTO{
-		Id: 	  dUser.ID,
+		Id:       dUser.ID,
 		Email:    dUser.Email,
 		Username: displayName,
 		Avatar:   avatarURL,
@@ -212,7 +253,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	
+
 	user, err := h.AuthService.RegisterUser(r.Context(), &dto)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -222,7 +263,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	verificationLink := fmt.Sprintf("%s/api/auth/verify-email?token=%s", h.BackendURL, user.VerificationToken)
 	emailReq := h.EmailService.NewEmailRequest(user.Email, verificationLink)
-	
+
 	if err := h.EmailService.SendEmail(*emailReq); err != nil {
 		fmt.Printf("Failed to send email to %s: %v\n", user.Email, err)
 		http.Error(w, "User created, but failed to send verification email.", http.StatusInternalServerError)
@@ -263,7 +304,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-	
+
 	if err := dto.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -289,15 +330,7 @@ func (h *AuthHandler) setCookieAndRedirect(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "KYOKUSU_API_TOKEN",
-		Value:    tokenString,
-		Path: 	  "/",
-		Expires:  time.Now().AddDate(0, 1, 0),
-		HttpOnly: false,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, h.newAuthCookie(tokenString))
 
 	http.Redirect(w, r, h.FrontendURL, http.StatusTemporaryRedirect)
 }
@@ -309,15 +342,7 @@ func (h *AuthHandler) setCookieAndJson(w http.ResponseWriter, user *dto.GetUserD
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "KYOKUSU_API_TOKEN",
-		Value:    tokenString,
-		Path: 	  "/",
-		Expires:  time.Now().AddDate(0, 1, 0),
-		HttpOnly: false,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, h.newAuthCookie(tokenString))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
@@ -329,13 +354,13 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found in context", http.StatusInternalServerError)
 		return
 	}
-	
+
 	user, err := h.UserService.GetUserById(userID)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-	
+
 	if user == nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -351,21 +376,14 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found in context", http.StatusInternalServerError)
 		return
 	}
-	
+
 	err := h.AuthService.UpdateStatus(r.Context(), userID, false)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-	
-	http.SetCookie(w, &http.Cookie{
-		Name:     "KYOKUSU_API_TOKEN",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: false,
-	})
+
+	http.SetCookie(w, h.newLogoutCookie())
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"message": "logged out"}`))
@@ -396,7 +414,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	resetLink := fmt.Sprintf("%s/login?token=%s", h.FrontendURL, resetToken)
 	emailReq := h.EmailService.NewResetPasswordEmailRequest(req.Email, resetLink)
-	
+
 	if err := h.EmailService.SendEmail(*emailReq); err != nil {
 		http.Error(w, "Failed to send reset email", http.StatusInternalServerError)
 		return

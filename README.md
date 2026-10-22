@@ -76,7 +76,8 @@ cd frontend && bun install && bun run dev
 | Переменная | Описание |
 |-----------|----------|
 | `DATABASE_URL` | Подключение к PostgreSQL |
-| `JWT_SECRET` | Секрет для JWT-токенов |
+| `JWT_SECRET` | Секрет для JWT-токенов (≥32 символов, не дефолтный) |
+| `COOKIE_SECURE` | `true` в проде (HTTPS): cookie отправляется только по HTTPS |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | OAuth Discord |
 | `KYOKUSU_EMAIL_NAME` / `KYOKUSU_EMAIL_PASSWORD` | SMTP для рассылки |
@@ -84,6 +85,8 @@ cd frontend && bun install && bun run dev
 | `BACKEND_URL` | URL бэкенда (редиректы) |
 | `NUXT_PUBLIC_API_BASE` | Базовый URL API (браузер) |
 | `PARSER_URL` | URL парсера (бэкенд → парсер) |
+
+Приложение не запустится, если `JWT_SECRET` или `DATABASE_URL` не заданы либо равны дефолтным значениям. Секреты генерируются командой `openssl rand -base64 48`.
 
 ---
 

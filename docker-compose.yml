@@ -26,7 +26,8 @@ services:
       - SERVER_ADDRESS=:8080
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - BACKEND_URL=${BACKEND_URL:-http://localhost:8080}
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a random value of at least 32 characters}
       # OAuth and Email settings should be set in .env or here
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -34,7 +35,6 @@ services:
       - SOCIAL_GOOGLE_REDIRECT_URL=${SOCIAL_GOOGLE_REDIRECT_URL:-http://localhost:8080/api/socials/google/callback}
       - DISCORD_CLIENT_URL=${DISCORD_CLIENT_URL:-http://localhost:8080/api/auth/discord/callback}
       - SOCIAL_DISCORD_CLIENT_URL=${SOCIAL_DISCORD_CLIENT_URL:-http://localhost:8080/api/socials/discord/callback}
-      - STATE=${STATE}
       - KYOKUSU_EMAIL_NAME=${KYOKUSU_EMAIL_NAME}
       - KYOKUSU_EMAIL_PASSWORD=${KYOKUSU_EMAIL_PASSWORD}
       - PARSER_URL=http://parser:3005

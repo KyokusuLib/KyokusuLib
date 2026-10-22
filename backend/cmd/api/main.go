@@ -1,14 +1,16 @@
 package main
 
 import (
+	"log"
+
 	"github.com/lanxre/kyokusulib/internal/app"
 	"github.com/lanxre/kyokusulib/internal/config"
 	"github.com/lanxre/kyokusulib/internal/handlers"
 	"github.com/lanxre/kyokusulib/internal/lib/logger"
+	rhService "github.com/lanxre/kyokusulib/internal/parse/service/ranobehub"
 	"github.com/lanxre/kyokusulib/internal/repository"
 	"github.com/lanxre/kyokusulib/internal/routes"
 	service "github.com/lanxre/kyokusulib/internal/services"
-	rhService "github.com/lanxre/kyokusulib/internal/parse/service/ranobehub"
 	tgService "github.com/lanxre/kyokusulib/internal/services/tg"
 	"github.com/lanxre/kyokusulib/internal/sse"
 	"github.com/lanxre/kyokusulib/internal/storage"
@@ -17,14 +19,18 @@ import (
 )
 
 func main() {
-	fx.New(
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("invalid configuration: %v", err)
+	}
+
+	app := fx.New(
 		fx.Provide(
-			config.Load,
-			logger.New,			
+			func() *config.Config { return cfg },
+			logger.New,
 			storage.NewPostgresDB,
 			storage.NewRedisClient,
 			app.NewValidator,
-			
 
 			sse.NewNotificationHub,
 			sse.NewTgPostsHub,
@@ -129,7 +135,7 @@ func main() {
 			app.AsRoute(func(h *handlers.UserTagHandler) *routes.UserTagRoutes {
 				return &routes.UserTagRoutes{Handler: h}
 			}),
-			
+
 			fx.Annotate(
 				app.NewMuxRouter,
 				fx.ParamTags("", `group:"routes"`),
@@ -145,5 +151,11 @@ func main() {
 			app.StartHTTPServer,
 		),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
-	).Run()
+	)
+
+	if err := app.Err(); err != nil {
+		log.Fatalf("failed to initialize application: %v", err)
+	}
+
+	app.Run()
 }

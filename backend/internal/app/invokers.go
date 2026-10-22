@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -69,14 +70,24 @@ func RegisterNotificationHubCleanup(lc fx.Lifecycle, hub *sse.NotificationHub) {
 	})
 }
 
-func StartHTTPServer(lc fx.Lifecycle, r *mux.Router, cfg *config.Config) {
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"},
+func corsOptions(cfg *config.Config) cors.Options {
+	var allowedOrigins []string
+	if origin := strings.TrimRight(strings.TrimSpace(cfg.FrontendURL), "/"); origin != "" {
+		allowedOrigins = append(allowedOrigins, origin)
+	}
+
+	return cors.Options{
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With", "Cookie"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
+		MaxAge:           600,
 		Debug:            false,
-	})
+	}
+}
+
+func StartHTTPServer(lc fx.Lifecycle, r *mux.Router, cfg *config.Config) {
+	c := cors.New(corsOptions(cfg))
 
 	handler := c.Handler(r)
 
