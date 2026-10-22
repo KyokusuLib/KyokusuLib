@@ -17,15 +17,14 @@ import (
 )
 
 type RanobeHubParseService struct {
-	NovelaService       *service.NovelaService
+	NovelaService *service.NovelaService
 }
 
 func NewRanobeHubParseService(novelaService *service.NovelaService) *RanobeHubParseService {
 	return &RanobeHubParseService{
-		NovelaService:       novelaService,
+		NovelaService: novelaService,
 	}
 }
-
 
 func (s *RanobeHubParseService) Parse(ctx context.Context, rhNovela *rhModels.RanobeHubNovela, userID int) error {
 	alternativeTitles := []string{rhNovela.Names.Eng}
@@ -72,6 +71,7 @@ func (s *RanobeHubParseService) Parse(ctx context.Context, rhNovela *rhModels.Ra
 			slog.Error("failed to link author", "name", name, "error", err)
 		}
 	}
+	s.NovelaService.InvalidateCache(ctx)
 
 	g := new(errgroup.Group)
 	for _, vol := range rhNovela.Volumes {
@@ -79,7 +79,12 @@ func (s *RanobeHubParseService) Parse(ctx context.Context, rhNovela *rhModels.Ra
 			return s.importVolume(ctx, novela.ID, userID, vol)
 		})
 	}
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	s.NovelaService.InvalidateCache(ctx)
+	return nil
 }
 
 func (s *RanobeHubParseService) importVolume(ctx context.Context, novelaID, userID int, vol rhModels.RanobeHubNovelaVolume) error {
@@ -129,4 +134,3 @@ func (s *RanobeHubParseService) importVolume(ctx context.Context, novelaID, user
 	}
 	return nil
 }
-

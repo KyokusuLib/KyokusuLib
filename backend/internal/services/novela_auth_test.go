@@ -10,9 +10,15 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
+	"github.com/redis/go-redis/v9"
 )
 
 func newAuthTestService(t *testing.T) *NovelaService {
+	t.Helper()
+	return newAuthTestServiceWithRedis(t, nil)
+}
+
+func newAuthTestServiceWithRedis(t *testing.T, redisClient *redis.Client) *NovelaService {
 	t.Helper()
 
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -38,7 +44,7 @@ func newAuthTestService(t *testing.T) *NovelaService {
 		repository.NewUserProfileRepository(db),
 		repository.NewUserTagRepository(db),
 		nil,
-		nil,
+		redisClient,
 	)
 }
 

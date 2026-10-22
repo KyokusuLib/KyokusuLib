@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"mime/multipart"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/lanxre/kyokusulib/internal/constants"
@@ -18,6 +20,12 @@ import (
 	"github.com/lanxre/kyokusulib/internal/strategy"
 	"github.com/lanxre/kyokusulib/internal/utils/files"
 	"github.com/redis/go-redis/v9"
+)
+
+const (
+	novelaCacheVersionKey = "novela:cache:version"
+	novelaListCacheTTL    = 30 * time.Second
+	novelaPageCacheTTL    = 60 * time.Second
 )
 
 type NovelaService struct {
@@ -31,6 +39,13 @@ type NovelaService struct {
 	NotificationService *NotificationService
 	redis               *redis.Client
 	awardStrategies     []strategy.AwardStrategy
+	cacheHits           atomic.Int64
+	cacheMisses         atomic.Int64
+}
+
+type novelaListCacheEntry struct {
+	Items []dto.NovelaResponse `json:"items"`
+	Total int                  `json:"total"`
 }
 
 func NewNovelaService(repo *repository.NovelaRepository,
@@ -57,6 +72,86 @@ func NewNovelaService(repo *repository.NovelaRepository,
 		redis:               redisClient,
 		awardStrategies:     initStrategies(ctx, userTagRepo, userRepo),
 	}
+}
+
+// CacheStats returns the number of page/list cache hits and misses since the
+// process started. Useful for verifying the cache-aside path in load tests.
+func (s *NovelaService) CacheStats() (hits, misses int64) {
+	return s.cacheHits.Load(), s.cacheMisses.Load()
+}
+
+// InvalidateCache bumps a Redis-backed generation counter. Cached entries are
+// keyed by the generation, so all readers switch to fresh keys immediately
+// without scanning or deleting individual keys.
+func (s *NovelaService) InvalidateCache(ctx context.Context) {
+	if s.redis == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	defer cancel()
+
+	if err := s.redis.Incr(ctx, novelaCacheVersionKey).Err(); err != nil {
+		log.Printf("novela cache invalidation failed: %v", err)
+	}
+}
+
+func (s *NovelaService) cacheVersion(ctx context.Context) (int64, bool) {
+	if s.redis == nil {
+		return 0, false
+	}
+
+	version, err := s.redis.Get(ctx, novelaCacheVersionKey).Int64()
+	if err == nil {
+		return version, true
+	}
+	if !errors.Is(err, redis.Nil) {
+		return 0, false
+	}
+
+	if err := s.redis.SetNX(ctx, novelaCacheVersionKey, 1, 0).Err(); err == nil {
+		return 1, true
+	}
+	if version, err := s.redis.Get(ctx, novelaCacheVersionKey).Int64(); err == nil {
+		return version, true
+	}
+	return 0, false
+}
+
+func (s *NovelaService) novelaListCacheKey(ctx context.Context, userID int, f dto.NovelaFilters) (string, bool) {
+	version, ok := s.cacheVersion(ctx)
+	if !ok {
+		return "", false
+	}
+
+	payload, err := json.Marshal(f)
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256(payload)
+
+	return fmt.Sprintf("novela:list:v%d:u%d:%x", version, userID, sum[:12]), true
+}
+
+func (s *NovelaService) novelaPageCacheKey(ctx context.Context, id, userID int, includeChapters bool) (string, bool) {
+	version, ok := s.cacheVersion(ctx)
+	if !ok {
+		return "", false
+	}
+
+	kind := "full"
+	if !includeChapters {
+		kind = "summary"
+	}
+
+	return fmt.Sprintf("novela:page:v%d:u%d:id%d:%s", version, userID, id, kind), true
+}
+
+func (s *NovelaService) invalidateCacheOnSuccess(ctx context.Context, err error) error {
+	if err == nil {
+		s.InvalidateCache(ctx)
+	}
+	return err
 }
 
 func initStrategies(
@@ -93,6 +188,18 @@ func initStrategies(
 }
 
 func (s *NovelaService) GetNovelaById(ctx context.Context, id, userID int, includeChapters bool) (dto.NovelaResponse, error) {
+	cacheKey, cacheable := s.novelaPageCacheKey(ctx, id, userID, includeChapters)
+	if cacheable {
+		if data, err := s.redis.Get(ctx, cacheKey).Bytes(); err == nil {
+			var cached dto.NovelaResponse
+			if err := json.Unmarshal(data, &cached); err == nil {
+				s.cacheHits.Add(1)
+				return cached, nil
+			}
+		}
+		s.cacheMisses.Add(1)
+	}
+
 	tx, err := s.Repo.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return dto.NovelaResponse{}, err
@@ -111,6 +218,12 @@ func (s *NovelaService) GetNovelaById(ctx context.Context, id, userID int, inclu
 	res.RatingDetails = s.mapRatingToDto(ratingData)
 	res.BookmarkDetails = s.mapBookmarkToDto(bookmarkData)
 
+	if cacheable {
+		if data, err := json.Marshal(res); err == nil {
+			_ = s.redis.Set(ctx, cacheKey, data, novelaPageCacheTTL).Err()
+		}
+	}
+
 	return res, nil
 }
 
@@ -119,11 +232,11 @@ func (s *NovelaService) UploadPoster(ctx context.Context, file multipart.File, h
 }
 
 func (s *NovelaService) SavePoster(ctx context.Context, id int, posterURL string) error {
-	return s.Repo.UpdatePoster(ctx, id, posterURL)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.UpdatePoster(ctx, id, posterURL))
 }
 
 func (s *NovelaService) Create(ctx context.Context, novela *db.Novela) error {
-	return s.Repo.Create(ctx, novela)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.Create(ctx, novela))
 }
 
 func (s *NovelaService) SetBookmark(ctx context.Context, userID int, req dto.UpdateBookmarkRequest) error {
@@ -138,27 +251,27 @@ func (s *NovelaService) SetBookmark(ctx context.Context, userID int, req dto.Upd
 		return errors.New("category is required")
 	}
 
-	return s.BookmarkRepo.SetBookmark(ctx, userID, req.NovelaID, categoryID)
+	return s.invalidateCacheOnSuccess(ctx, s.BookmarkRepo.SetBookmark(ctx, userID, req.NovelaID, categoryID))
 }
 
 func (s *NovelaService) RemoveBookmark(ctx context.Context, userID, novelaID int) error {
-	return s.BookmarkRepo.RemoveBookmark(ctx, userID, novelaID)
+	return s.invalidateCacheOnSuccess(ctx, s.BookmarkRepo.RemoveBookmark(ctx, userID, novelaID))
 }
 
 func (s *NovelaService) SetLike(ctx context.Context, userID int, req dto.UpdateLikeRequest) error {
-	return s.LikeRepo.SetLike(ctx, &db.NovelaLike{
+	return s.invalidateCacheOnSuccess(ctx, s.LikeRepo.SetLike(ctx, &db.NovelaLike{
 		UserID:   userID,
 		NovelaID: req.NovelaID,
 		HasLiked: req.HasLiked,
-	})
+	}))
 }
 
 func (s *NovelaService) SetRating(ctx context.Context, userID int, req dto.UpdateRatingRequest) error {
-	return s.RatingRepo.SetRating(ctx, &db.NovelaRating{
+	return s.invalidateCacheOnSuccess(ctx, s.RatingRepo.SetRating(ctx, &db.NovelaRating{
 		UserID:   userID,
 		NovelaID: req.NovelaID,
 		Rating:   req.Rating,
-	})
+	}))
 }
 
 func (s *NovelaService) AuthorizeNovelaEdit(ctx context.Context, id, userID int) error {
@@ -219,12 +332,28 @@ func (s *NovelaService) UpdateNovela(ctx context.Context, id, userID int, req dt
 		return ErrInternal
 	}
 
+	s.InvalidateCache(ctx)
 	return nil
 }
 
 func (s *NovelaService) GetNovelas(ctx context.Context, userID int, f dto.NovelaFilters) ([]dto.NovelaResponse, int, error) {
 	if f.Limit <= 0 || f.Limit > 100 {
 		f.Limit = 20
+	}
+	if f.Sort == "" {
+		f.Sort = dto.SortNew
+	}
+
+	cacheKey, cacheable := s.novelaListCacheKey(ctx, userID, f)
+	if cacheable {
+		if data, err := s.redis.Get(ctx, cacheKey).Bytes(); err == nil {
+			var cached novelaListCacheEntry
+			if err := json.Unmarshal(data, &cached); err == nil {
+				s.cacheHits.Add(1)
+				return cached.Items, cached.Total, nil
+			}
+		}
+		s.cacheMisses.Add(1)
 	}
 
 	tx, err := s.Repo.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
@@ -261,7 +390,18 @@ func (s *NovelaService) GetNovelas(ctx context.Context, userID int, f dto.Novela
 		res = append(res, d)
 	}
 
-	return res, total, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
+
+	if cacheable {
+		entry := novelaListCacheEntry{Items: res, Total: total}
+		if data, err := json.Marshal(entry); err == nil {
+			_ = s.redis.Set(ctx, cacheKey, data, novelaListCacheTTL).Err()
+		}
+	}
+
+	return res, total, nil
 }
 
 func (s *NovelaService) GetUserNovelaBookmarks(ctx context.Context, userID int, category string) ([]dto.UserNovelaBookmark, error) {
@@ -379,19 +519,23 @@ func (s *NovelaService) GetBookmarkCategories(ctx context.Context, userID int) (
 }
 
 func (s *NovelaService) CreateBookmarkCategory(ctx context.Context, userID int, name string) (int, error) {
-	return s.BookmarkRepo.CreateCategory(ctx, userID, name)
+	id, err := s.BookmarkRepo.CreateCategory(ctx, userID, name)
+	if err == nil {
+		s.InvalidateCache(ctx)
+	}
+	return id, err
 }
 
 func (s *NovelaService) UpdateBookmarkCategory(ctx context.Context, id int, userID int, name string, visible bool) error {
-	return s.BookmarkRepo.UpdateCategory(ctx, id, userID, name, visible)
+	return s.invalidateCacheOnSuccess(ctx, s.BookmarkRepo.UpdateCategory(ctx, id, userID, name, visible))
 }
 
 func (s *NovelaService) DeleteBookmarkCategory(ctx context.Context, id int, userID int) error {
-	return s.BookmarkRepo.DeleteCategory(ctx, id, userID)
+	return s.invalidateCacheOnSuccess(ctx, s.BookmarkRepo.DeleteCategory(ctx, id, userID))
 }
 
 func (s *NovelaService) DeleteNovela(ctx context.Context, id int) error {
-	return s.Repo.Delete(ctx, id)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.Delete(ctx, id))
 }
 
 func (s *NovelaService) AddTeamToNovela(ctx context.Context, novelaID, teamID int) error {
@@ -422,10 +566,15 @@ func (s *NovelaService) AddVolume(ctx context.Context, novelaID int, userID int,
 	}
 
 	id, err := s.Repo.AddVolume(ctx, novelaID, req.VolumeNumber, req.Title, status, userID)
-	if err == nil && status == "approved" {
+	if err != nil {
+		return "", "", err
+	}
+
+	s.InvalidateCache(ctx)
+	if status == "approved" {
 		go s.safeSendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлен новый том!")
 	}
-	return id, status, err
+	return id, status, nil
 }
 
 func (s *NovelaService) AddChapter(ctx context.Context, volumeID string, userID int, req dto.AddChapterRequest) (string, string, error) {
@@ -450,10 +599,15 @@ func (s *NovelaService) AddChapter(ctx context.Context, volumeID string, userID 
 	}
 
 	id, err := s.Repo.AddChapter(ctx, volumeID, req.ChapterNumber, req.Title, req.Content, status, userID)
-	if err == nil && status == "approved" {
+	if err != nil {
+		return "", "", err
+	}
+
+	s.InvalidateCache(ctx)
+	if status == "approved" {
 		go s.safeSendNovelaNotification(novelaID, "Обновление", "В новеллу '%s' добавлена новая глава!")
 	}
-	return id, status, err
+	return id, status, nil
 }
 
 func (s *NovelaService) sendNovelaNotification(novelaID int, title, messageFmt string) {
@@ -488,15 +642,19 @@ func (s *NovelaService) safeSendNovelaNotification(novelaID int, title, messageF
 }
 
 func (s *NovelaService) DeleteChapterImages(ctx context.Context, chapterID string) error {
-	return s.Repo.DeleteChapterImages(ctx, chapterID)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.DeleteChapterImages(ctx, chapterID))
 }
 
 func (s *NovelaService) AddChapterImage(ctx context.Context, chapterID string, req dto.AddChapterImageRequest) (int, error) {
-	return s.Repo.AddChapterImage(ctx, chapterID, req.ImageURL, req.Caption, req.Position)
+	id, err := s.Repo.AddChapterImage(ctx, chapterID, req.ImageURL, req.Caption, req.Position)
+	if err == nil {
+		s.InvalidateCache(ctx)
+	}
+	return id, err
 }
 
 func (s *NovelaService) AddChapterImages(ctx context.Context, chapterID string, images []dto.AddChapterImageRequest) error {
-	return s.Repo.AddChapterImages(ctx, chapterID, images)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.AddChapterImages(ctx, chapterID, images))
 }
 
 func (s *NovelaService) GetChapterReaderDetails(ctx context.Context, chapterID string, userID int) (*dto.ChapterReaderResponse, error) {
@@ -517,7 +675,7 @@ func (s *NovelaService) GetVolumeChapters(ctx context.Context, volumeID string, 
 }
 
 func (s *NovelaService) SaveChapterReadPosition(ctx context.Context, userID int, req dto.SaveReadPositionRequest) error {
-	return s.Repo.UpdateChapterReadPosition(ctx, userID, req.ChapterID, req.ScrollPosition)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.UpdateChapterReadPosition(ctx, userID, req.ChapterID, req.ScrollPosition))
 }
 
 func (s *NovelaService) UpdateChapter(ctx context.Context, chapterID string, userID int, req dto.AddChapterRequest) error {
@@ -529,7 +687,7 @@ func (s *NovelaService) UpdateChapter(ctx context.Context, chapterID string, use
 		return errors.New("forbidden: you do not have permission to update this chapter")
 	}
 
-	return s.Repo.UpdateChapter(ctx, chapterID, req.ChapterNumber, req.Title, req.Content)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.UpdateChapter(ctx, chapterID, req.ChapterNumber, req.Title, req.Content))
 }
 
 func (s *NovelaService) DeleteVolume(ctx context.Context, volumeID string, userID int) error {
@@ -552,7 +710,7 @@ func (s *NovelaService) DeleteVolume(ctx context.Context, volumeID string, userI
 		return errors.New("forbidden: you do not have permission to delete this volume")
 	}
 
-	return s.Repo.DeleteVolume(ctx, volumeID)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.DeleteVolume(ctx, volumeID))
 }
 
 func (s *NovelaService) DeleteChapter(ctx context.Context, chapterID string, userID int) error {
@@ -564,7 +722,7 @@ func (s *NovelaService) DeleteChapter(ctx context.Context, chapterID string, use
 		return errors.New("forbidden: you do not have permission to delete this chapter")
 	}
 
-	return s.Repo.DeleteChapter(ctx, chapterID)
+	return s.invalidateCacheOnSuccess(ctx, s.Repo.DeleteChapter(ctx, chapterID))
 }
 
 func (s *NovelaService) MarkChapterAsRead(ctx context.Context, userID int, chapterID string) (*db.UserLevel, error) {
@@ -585,6 +743,7 @@ func (s *NovelaService) MarkChapterAsRead(ctx context.Context, userID int, chapt
 		if _, err := s.Repo.MarkChapterAsRead(ctx, userID, chapterID); err != nil {
 			return nil, err
 		}
+		s.InvalidateCache(ctx)
 	}
 
 	dataLevel, err := s.UpLevelForReading(ctx, userID)

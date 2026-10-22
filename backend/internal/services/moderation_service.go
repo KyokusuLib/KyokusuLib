@@ -50,6 +50,7 @@ func (s *ModerationService) ApproveVolume(ctx context.Context, id string) error 
 	if err != nil {
 		return err
 	}
+	s.NovelaService.InvalidateCache(ctx)
 
 	novelaID, err := s.NovelaRepo.GetNovelaIDByVolumeID(ctx, id)
 	if err == nil {
@@ -60,7 +61,11 @@ func (s *ModerationService) ApproveVolume(ctx context.Context, id string) error 
 }
 
 func (s *ModerationService) RejectVolume(ctx context.Context, id string) error {
-	return s.NovelaRepo.UpdateVolumeStatus(ctx, id, "rejected")
+	err := s.NovelaRepo.UpdateVolumeStatus(ctx, id, "rejected")
+	if err == nil {
+		s.NovelaService.InvalidateCache(ctx)
+	}
+	return err
 }
 
 func (s *ModerationService) ApproveChapter(ctx context.Context, id string) error {
@@ -76,6 +81,7 @@ func (s *ModerationService) ApproveChapter(ctx context.Context, id string) error
 	if err != nil {
 		return err
 	}
+	s.NovelaService.InvalidateCache(ctx)
 
 	novelaID, err := s.NovelaRepo.GetNovelaIDByChapterID(ctx, id)
 	if err == nil {
@@ -86,13 +92,25 @@ func (s *ModerationService) ApproveChapter(ctx context.Context, id string) error
 }
 
 func (s *ModerationService) RejectChapter(ctx context.Context, id string) error {
-	return s.NovelaRepo.UpdateChapterStatus(ctx, id, "rejected")
+	err := s.NovelaRepo.UpdateChapterStatus(ctx, id, "rejected")
+	if err == nil {
+		s.NovelaService.InvalidateCache(ctx)
+	}
+	return err
 }
 
 func (s *ModerationService) UpdateVolume(ctx context.Context, id string, req dto.UpdateVolumeRequest) error {
-	return s.NovelaRepo.UpdateVolume(ctx, id, req.VolumeNumber, req.Title)
+	err := s.NovelaRepo.UpdateVolume(ctx, id, req.VolumeNumber, req.Title)
+	if err == nil {
+		s.NovelaService.InvalidateCache(ctx)
+	}
+	return err
 }
 
 func (s *ModerationService) UpdateChapter(ctx context.Context, id string, req dto.UpdateChapterRequest) error {
-	return s.NovelaRepo.UpdateChapter(ctx, id, req.ChapterNumber, req.Title, req.Content)
+	err := s.NovelaRepo.UpdateChapter(ctx, id, req.ChapterNumber, req.Title, req.Content)
+	if err == nil {
+		s.NovelaService.InvalidateCache(ctx)
+	}
+	return err
 }
