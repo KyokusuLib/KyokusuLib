@@ -56,10 +56,10 @@ export function useNotifications() {
     }
   }
 
-  async function fetchList(limit?: number, offset?: number) {
+  async function fetchList(limit?: number) {
     try {
       const data = await $api<BackendNotification[]>('/notifications', {
-        query: { limit, offset },
+        query: { limit },
       })
       list.value = data
       return data

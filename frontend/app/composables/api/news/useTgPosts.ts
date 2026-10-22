@@ -4,6 +4,9 @@ import type { BackendTgPost } from '@/types/backend/tg-post'
 export function useTgPosts() {
   const posts = useState<BackendTgPost[]>('tg-posts', () => [])
   const stream = useState<EventSource | null>('tg-posts-stream', () => null)
+  const nextCursor = useState<string | null>('tg-posts-next-cursor', () => null)
+  const hasMore = useState<boolean>('tg-posts-has-more', () => false)
+  const isLoadingMore = useState<boolean>('tg-posts-loading-more', () => false)
 
   let reconnectAttempts = 0
   const MAX_RECONNECT_DELAY = 30000
@@ -51,14 +54,40 @@ export function useTgPosts() {
     }
   }
 
-  async function fetchTgPosts(limit = 50) {
+  async function fetchTgPosts(limit = 50, cursor?: string) {
+    isLoadingMore.value = Boolean(cursor)
     try {
-      const data = await $api<BackendTgPost[]>('/tg/posts', { query: { limit } })
-      posts.value = data
+      const response = await $fetch.raw<BackendTgPost[]>('/api/tg/posts', {
+        query: { limit, cursor },
+        headers: useRequestHeaders(['cookie']),
+      })
+      const data = response._data ?? []
+
+      if (cursor) {
+        const known = new Set(posts.value.map((post) => post.id))
+        posts.value = [...posts.value, ...data.filter((post) => !known.has(post.id))]
+      } else {
+        posts.value = data
+      }
+
+      nextCursor.value = response.headers.get('x-next-cursor')
+      hasMore.value = response.headers.get('x-has-more') === 'true'
       return data
     } catch {
+      if (!cursor) {
+        posts.value = []
+        nextCursor.value = null
+        hasMore.value = false
+      }
       return []
+    } finally {
+      isLoadingMore.value = false
     }
+  }
+
+  async function loadMoreTgPosts() {
+    if (!nextCursor.value || isLoadingMore.value) return []
+    return fetchTgPosts(50, nextCursor.value)
   }
 
   async function deleteTgPost(id: number) {
@@ -68,7 +97,10 @@ export function useTgPosts() {
 
   return {
     posts,
+    hasMore,
+    isLoadingMore,
     fetchTgPosts,
+    loadMoreTgPosts,
     connectStream,
     disconnectStream,
     deleteTgPost,

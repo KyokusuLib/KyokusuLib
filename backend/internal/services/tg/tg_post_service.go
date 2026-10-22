@@ -9,6 +9,7 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
 	"github.com/lanxre/kyokusulib/internal/sse"
+	"github.com/lanxre/kyokusulib/internal/utils/cursor"
 	"github.com/lanxre/kyokusulib/internal/utils/files"
 )
 
@@ -38,21 +39,27 @@ func (s *TgPostService) Create(ctx context.Context, post *db.TgPost) (*dto.TgPos
 	return result, nil
 }
 
-func (s *TgPostService) List(ctx context.Context, limit, offset int) ([]*dto.TgPost, error) {
+func (s *TgPostService) List(ctx context.Context, limit int, after *cursor.Cursor) (dto.CursorPage[*dto.TgPost], error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 
-	posts, err := s.Repo.List(ctx, limit, offset)
+	posts, hasMore, err := s.Repo.List(ctx, limit, after)
 	if err != nil {
-		return nil, err
+		return dto.CursorPage[*dto.TgPost]{}, err
 	}
 
 	result := make([]*dto.TgPost, 0, len(posts))
 	for _, p := range posts {
 		result = append(result, toTgPostDTO(p))
 	}
-	return result, nil
+
+	page := dto.CursorPage[*dto.TgPost]{Items: result, HasMore: hasMore}
+	if hasMore && len(result) > 0 {
+		last := result[len(result)-1]
+		page.NextCursor = cursor.Encode(last.CreatedAt, last.ID)
+	}
+	return page, nil
 }
 
 func (s *TgPostService) Delete(ctx context.Context, id int64) error {

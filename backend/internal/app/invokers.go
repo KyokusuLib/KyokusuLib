@@ -80,6 +80,7 @@ func corsOptions(cfg *config.Config) cors.Options {
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
+		ExposedHeaders:   []string{"X-Next-Cursor", "X-Has-More"},
 		AllowCredentials: true,
 		MaxAge:           600,
 		Debug:            false,

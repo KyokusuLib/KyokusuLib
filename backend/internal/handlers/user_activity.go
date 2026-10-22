@@ -10,7 +10,6 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	service "github.com/lanxre/kyokusulib/internal/services"
 	"github.com/lanxre/kyokusulib/internal/utils/response"
-	"github.com/lanxre/kyokusulib/internal/utils/conv"
 )
 
 type UserActivityHandler struct {
@@ -29,7 +28,7 @@ func (h *UserActivityHandler) CreateUserActivity(w http.ResponseWriter, r *http.
 		response.Error(w, http.StatusInternalServerError, "User not found")
 		return
 	}
-	
+
 	var userActivity dto.CreateUserActivity
 	if err := json.NewDecoder(r.Body).Decode(&userActivity); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -51,20 +50,20 @@ func (h *UserActivityHandler) GetUserActivities(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	query := r.URL.Query()
-    
-    params := dto.QueryParams{
-        Limit:  conv.StringToInt(query.Get("limit")),
-        Offset: conv.StringToInt(query.Get("offset")),
-    }
+	limit, after, err := parseFeedPagination(r, 20)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	activities, err := h.Service.GetUserActivity(r.Context(), userID, params)
+	page, err := h.Service.GetUserActivity(r.Context(), userID, limit, after)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.Success(w, http.StatusOK, activities)
+	setCursorHeaders(w, page)
+	response.Success(w, http.StatusOK, page.Items)
 }
 
 func (h *UserActivityHandler) GetUserActivityById(w http.ResponseWriter, r *http.Request) {
@@ -81,18 +80,18 @@ func (h *UserActivityHandler) GetUserActivityById(w http.ResponseWriter, r *http
 		return
 	}
 
-	query := r.URL.Query()
-    
-    params := dto.QueryParams{
-        Limit:  conv.StringToInt(query.Get("limit")),
-        Offset: conv.StringToInt(query.Get("offset")),
-    }
+	limit, after, err := parseFeedPagination(r, 20)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	activity, err := h.Service.GetUserActivity(r.Context(), userID, params)
+	page, err := h.Service.GetUserActivity(r.Context(), userID, limit, after)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.Success(w, http.StatusOK, activity)
+	setCursorHeaders(w, page)
+	response.Success(w, http.StatusOK, page.Items)
 }

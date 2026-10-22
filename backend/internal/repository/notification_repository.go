@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lanxre/kyokusulib/internal/utils/cursor"
 	"github.com/lib/pq"
 )
 
@@ -56,32 +57,48 @@ func (r *NotificationRepository) CreateBatch(ctx context.Context, userIDs []int6
 	return notifications, nil
 }
 
-func (r *NotificationRepository) GetByUserID(ctx context.Context, userID int64, limit, offset int) ([]*db.Notification, error) {
+func (r *NotificationRepository) GetByUserID(ctx context.Context, userID int64, limit int, after *cursor.Cursor) ([]*db.Notification, bool, error) {
 	query := `
 		SELECT id, user_id, title, message, is_read, created_at
 		FROM notifications
 		WHERE user_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`
-	rows, err := r.DB.QueryContext(ctx, query, userID, limit, offset)
+		ORDER BY created_at DESC, id DESC
+		LIMIT $2`
+	args := []any{userID, limit + 1}
+	if after != nil {
+		query = `
+		SELECT id, user_id, title, message, is_read, created_at
+		FROM notifications
+		WHERE user_id = $1 AND (created_at, id) < ($2, $3)
+		ORDER BY created_at DESC, id DESC
+		LIMIT $4`
+		args = []any{userID, after.Time, after.ID, limit + 1}
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 
-	var notifications []*db.Notification
+	notifications := make([]*db.Notification, 0, limit+1)
 	for rows.Next() {
 		var n db.Notification
 		err := rows.Scan(&n.ID, &n.UserID, &n.Title, &n.Message, &n.IsRead, &n.CreatedAt)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		notifications = append(notifications, &n)
 	}
-	if notifications == nil {
-		notifications = []*db.Notification{}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
 	}
-	return notifications, nil
+
+	hasMore := len(notifications) > limit
+	if hasMore {
+		notifications = notifications[:limit]
+	}
+	return notifications, hasMore, nil
 }
 
 func (r *NotificationRepository) GetSinceID(ctx context.Context, userID int64, lastID int64, limit int) ([]*db.Notification, error) {

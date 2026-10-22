@@ -22,7 +22,7 @@ export function useNotificationManager() {
   async function load() {
     if (!isAuthenticated.value) return
     isLoading.value = true
-    await fetchList(100, 0)
+    await fetchList(100)
     isLoading.value = false
   }
 

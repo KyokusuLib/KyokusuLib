@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lanxre/kyokusulib/internal/utils/cursor"
 	"github.com/lib/pq"
 )
 
@@ -59,34 +60,53 @@ func (r *TgPostRepository) Create(ctx context.Context, p *db.TgPost) (*db.TgPost
 	return p, nil
 }
 
-func (r *TgPostRepository) List(ctx context.Context, limit, offset int) ([]*db.TgPost, error) {
+func (r *TgPostRepository) List(ctx context.Context, limit int, after *cursor.Cursor) ([]*db.TgPost, bool, error) {
 	query := `
 		SELECT id, message_id, text, created_at
 		FROM tg_posts
 		ORDER BY created_at DESC, id DESC
-		LIMIT $1 OFFSET $2`
-	rows, err := r.DB.QueryContext(ctx, query, limit, offset)
+		LIMIT $1`
+	args := []any{limit + 1}
+	if after != nil {
+		query = `
+		SELECT id, message_id, text, created_at
+		FROM tg_posts
+		WHERE (created_at, id) < ($1, $2)
+		ORDER BY created_at DESC, id DESC
+		LIMIT $3`
+		args = []any{after.Time, after.ID, limit + 1}
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 
-	var posts []*db.TgPost
+	posts := make([]*db.TgPost, 0, limit+1)
 	for rows.Next() {
 		var p db.TgPost
 		if err := rows.Scan(&p.ID, &p.MessageID, &p.Text, &p.CreatedAt); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		posts = append(posts, &p)
 	}
-	if posts == nil {
-		return []*db.TgPost{}, nil
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(posts) > limit
+	if hasMore {
+		posts = posts[:limit]
+	}
+	if len(posts) == 0 {
+		return []*db.TgPost{}, hasMore, nil
 	}
 
 	if err := r.attachImages(ctx, posts); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return posts, nil
+	return posts, hasMore, nil
 }
 
 func (r *TgPostRepository) GetByID(ctx context.Context, id int64) (*db.TgPost, error) {

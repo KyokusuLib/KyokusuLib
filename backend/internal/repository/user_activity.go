@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/lanxre/kyokusulib/internal/models/db"
+	"github.com/lanxre/kyokusulib/internal/utils/cursor"
 )
 
 type UserActivityRepository struct {
@@ -15,21 +16,31 @@ func NewUserActivityRepository(db *sql.DB) *UserActivityRepository {
 	return &UserActivityRepository{DB: db}
 }
 
-func (r *UserActivityRepository) GetUserActivies(ctx context.Context, userID, limit int) ([] *db.UserActivity, error) {
-	var userActivity []*db.UserActivity
+func (r *UserActivityRepository) GetUserActivies(ctx context.Context, userID, limit int, after *cursor.Cursor) ([]*db.UserActivity, bool, error) {
 	query := `
-		SELECT id, activity_type, target_id, metadata, timestamp
+		SELECT id, activity_type, target_id, metadata, "timestamp"
 		FROM user_activities
 		WHERE user_id = $1
-		ORDER BY timestamp DESC 
-        LIMIT $2`
-	
-	rows, err := r.DB.QueryContext(ctx, query, userID, limit)
+		ORDER BY "timestamp" DESC, id DESC
+		LIMIT $2`
+	args := []any{userID, limit + 1}
+	if after != nil {
+		query = `
+		SELECT id, activity_type, target_id, metadata, "timestamp"
+		FROM user_activities
+		WHERE user_id = $1 AND ("timestamp", id) < ($2, $3)
+		ORDER BY "timestamp" DESC, id DESC
+		LIMIT $4`
+		args = []any{userID, after.Time, after.ID, limit + 1}
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
-	
+
+	userActivity := make([]*db.UserActivity, 0, limit+1)
 	for rows.Next() {
 		var activity db.UserActivity
 		err := rows.Scan(
@@ -40,12 +51,19 @@ func (r *UserActivityRepository) GetUserActivies(ctx context.Context, userID, li
 			&activity.Timestamp,
 		)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		userActivity = append(userActivity, &activity)
 	}
-	
-	return userActivity, nil
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(userActivity) > limit
+	if hasMore {
+		userActivity = userActivity[:limit]
+	}
+	return userActivity, hasMore, nil
 }
 
 func (r *UserActivityRepository) CreateUserActivity(ctx context.Context, userActivity *db.UserActivity) error {
@@ -56,6 +74,6 @@ func (r *UserActivityRepository) CreateUserActivity(ctx context.Context, userAct
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }

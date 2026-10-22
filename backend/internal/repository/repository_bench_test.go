@@ -175,7 +175,7 @@ func BenchmarkTgPostList(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.List(ctx, 20, 0); err != nil {
+		if _, _, err := repo.List(ctx, 20, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -236,7 +236,7 @@ func BenchmarkNotificationList(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.GetByUserID(ctx, 8, 20, 0); err != nil {
+		if _, _, err := repo.GetByUserID(ctx, 8, 20, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

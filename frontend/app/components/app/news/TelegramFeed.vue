@@ -9,7 +9,7 @@ import { SocialNetwork } from '@/types/enums/social-network-enum'
 import type { BackendTgPost } from '@/types/backend/tg-post'
 
 const { hasPermission } = useRolePermissions()
-const { posts, fetchTgPosts, connectStream, disconnectStream, deleteTgPost } = useTgPosts()
+const { posts, hasMore, isLoadingMore, fetchTgPosts, loadMoreTgPosts, connectStream, disconnectStream, deleteTgPost } = useTgPosts()
 
 const source = computed(() => NEWS_SOURCES.find((s) => s.id === SocialNetwork.Telegram))
 
@@ -67,6 +67,15 @@ onUnmounted(() => {
       :can-delete="canDelete"
       @delete="postToDelete = $event"
     />
+
+    <button
+      v-if="hasMore"
+      :disabled="isLoadingMore"
+      class="w-full py-2 text-center text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      @click="loadMoreTgPosts"
+    >
+      {{ isLoadingMore ? 'Загрузка…' : 'Показать ещё' }}
+    </button>
 
     <ModalConfirm
       v-model="showDeleteModal"

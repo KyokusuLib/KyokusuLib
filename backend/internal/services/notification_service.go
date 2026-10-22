@@ -7,6 +7,7 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	"github.com/lanxre/kyokusulib/internal/repository"
 	"github.com/lanxre/kyokusulib/internal/sse"
+	"github.com/lanxre/kyokusulib/internal/utils/cursor"
 )
 
 type NotificationService struct {
@@ -66,14 +67,14 @@ func (s *NotificationService) CreateBatch(ctx context.Context, userIDs []int64, 
 	return nil
 }
 
-func (s *NotificationService) GetByUserID(ctx context.Context, userID int64, params dto.QueryParams) ([]*dto.Notification, error) {
-	if params.Limit <= 0 || params.Limit > 100 {
-		params.Limit = 50
+func (s *NotificationService) GetByUserID(ctx context.Context, userID int64, limit int, after *cursor.Cursor) (dto.CursorPage[*dto.Notification], error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
 	}
 
-	notifications, err := s.Repo.GetByUserID(ctx, userID, params.Limit, params.Offset)
+	notifications, hasMore, err := s.Repo.GetByUserID(ctx, userID, limit, after)
 	if err != nil {
-		return nil, err
+		return dto.CursorPage[*dto.Notification]{}, err
 	}
 
 	result := make([]*dto.Notification, 0, len(notifications))
@@ -87,7 +88,13 @@ func (s *NotificationService) GetByUserID(ctx context.Context, userID int64, par
 			CreatedAt: n.CreatedAt,
 		})
 	}
-	return result, nil
+
+	page := dto.CursorPage[*dto.Notification]{Items: result, HasMore: hasMore}
+	if hasMore && len(result) > 0 {
+		last := result[len(result)-1]
+		page.NextCursor = cursor.Encode(last.CreatedAt, last.ID)
+	}
+	return page, nil
 }
 
 func (s *NotificationService) GetSinceID(ctx context.Context, userID int64, lastID int64) ([]*dto.Notification, error) {
@@ -131,7 +138,7 @@ func (s *NotificationService) GetNotificationStats(ctx context.Context, userID i
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return s.mapNotificatonStats(int64(unreadCount)), nil
 }
 

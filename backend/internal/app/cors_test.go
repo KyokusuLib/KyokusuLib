@@ -31,6 +31,10 @@ func TestCORSAllowsConfiguredFrontend(t *testing.T) {
 	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
 		t.Errorf("Access-Control-Allow-Credentials = %q, want true", got)
 	}
+	exposed := rec.Header().Get("Access-Control-Expose-Headers")
+	if !strings.Contains(exposed, "X-Next-Cursor") || !strings.Contains(exposed, "X-Has-More") {
+		t.Errorf("Access-Control-Expose-Headers = %q, want cursor headers", exposed)
+	}
 }
 
 func TestCORSRejectsForeignOrigin(t *testing.T) {

@@ -8,10 +8,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lanxre/kyokusulib/internal/middleware"
-	"github.com/lanxre/kyokusulib/internal/models/dto"
 	service "github.com/lanxre/kyokusulib/internal/services"
 	"github.com/lanxre/kyokusulib/internal/sse"
-	"github.com/lanxre/kyokusulib/internal/utils/conv"
 	"github.com/lanxre/kyokusulib/internal/utils/response"
 )
 
@@ -100,36 +98,20 @@ func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := r.URL.Query()
-
-	limit := conv.StringToInt(query.Get("limit"))
-	offset := conv.StringToInt(query.Get("offset"))
-
-	if limit < 0 {
-		response.Error(w, http.StatusBadRequest, "limit must be non-negative")
-		return
-	}
-	if offset < 0 {
-		response.Error(w, http.StatusBadRequest, "offset must be non-negative")
-		return
-	}
-	if limit > 100 {
-		response.Error(w, http.StatusBadRequest, "limit must not exceed 100")
+	limit, after, err := parseFeedPagination(r, 50)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	params := dto.QueryParams{
-		Limit:  limit,
-		Offset: offset,
-	}
-
-	notifications, err := h.Service.GetByUserID(r.Context(), int64(userID), params)
+	page, err := h.Service.GetByUserID(r.Context(), int64(userID), limit, after)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.SuccessWithEntity(w, http.StatusOK, notifications)
+	setCursorHeaders(w, page)
+	response.SuccessWithEntity(w, http.StatusOK, page.Items)
 }
 
 func (h *NotificationHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
