@@ -39,9 +39,34 @@
 | 0.1 | Индекс `novela_chapter_images(chapter_id, position)` | Убрать `Seq Scan` × 474 на странице новеллы | SQL < 10 мс, RPS ×3 | ✅ сделано |
 | 0.2 | Разгрузить ответ страницы новеллы | 122 KB и 737 KB аллокаций на каждый просмотр; главы с картинками грузятся целиком | метаданные + список томов/глав < 40 KB; картинки — отдельным запросом | ✅ сделано: summary 8.3 KB + главы активного тома 1.7 KB; картинки только в `/api/novela/chapters/{id}` |
 | 0.3 | Ресайз изображений в фоновую очередь | 34–51 мс и 15–21 MB блокируют HTTP-запрос | p95 upload < 200 мс, воркер масштабируется отдельно | план |
-| 0.4 | Аудит индексов по `EXPLAIN ANALYZE` | Список/поиск/уведомления/активность | нет `Seq Scan` на горячих запросах | план |
+| 0.4 | Аудит индексов по `EXPLAIN ANALYZE` | Список/поиск/уведомления/активность | нет `Seq Scan` на горячих запросах | ✅ сделано: индексы и GIN добавлены; на dev-данных часть `Seq Scan` остаётся из-за размера таблиц |
 | 0.5 | Cache-aside в Redis для каталога и новеллы | Redis используется только для pubsub и rate limit | cache hit > 70% на `GET /api/novela` | план |
 | 0.6 | Cursor-пагинация лент | Offset деградирует на больших таблицах | TG/уведомления/активность на keyset | план |
+
+### Замеры 0.4
+
+Добавлены индексы: `notifications(user_id, created_at DESC)`,
+`user_activities(user_id, timestamp DESC)`,
+`user_novela_bookmarks(user_id, category_id, updated_at DESC)`,
+`novela_genres(genre_id, novela_id)`,
+`novela_categories(category_id, novela_id)`,
+`novela(created_at DESC)`, `novela(views DESC)`,
+частичный `novela_chapters(novela_volume_id, created_at DESC) WHERE status = 'approved'`
+и GIN `pg_trgm` по выражению `novela_search_text(title, alternative_titles)`.
+
+| Запрос | До | После |
+|---|---:|---:|
+| Уведомления, `user_id + created_at DESC` (тёплые) | 0.053–0.061 мс, Bitmap + Sort | 0.015–0.017 мс, Index Scan без Sort |
+| Активность, `user_id=27` (форсированный индекс) | 0.111 мс, Seq Scan, 9 buffers | 0.052 мс, Bitmap Index Scan, 3 buffers |
+| Каталог, сортировка `created_at DESC` | Seq Scan + Sort | `Index Scan idx_novela_created_at` |
+| `last_chapter_at` / `chapters_count` | Seq Scan `novela_chapters` | `Index Only Scan idx_novela_chapters_volume_created_approved` |
+| Поиск по названию/альтернативным названиям | Seq Scan, ветка `$1 ILIKE ANY(alternative_titles)` не работала | GIN `Bitmap Index Scan`; `GET /api/novela?search=monarch` находит «Я - Монарх» по `I am the Monarch` |
+
+Данные в dev-БД маленькие (7 новелл, 573 уведомления, 159 активностей), поэтому
+планировщик намеренно оставляет `Seq Scan` на таблицах в несколько страниц.
+Проверка индексов выполнялась через `EXPLAIN` с `enable_seqscan=off`; на росте
+данных выбираются индексы. Поиск переписан на `novela_search_text()`, иначе OR
+с неиндексируемой веткой не давал использовать GIN.
 
 ## Этап 1. Безопасность (P0)
 

@@ -146,6 +146,27 @@ func BenchmarkNovelaList(b *testing.B) {
 	}
 }
 
+func BenchmarkNovelaListSearch(b *testing.B) {
+	db := benchDB(b)
+	repo := NewNovelaRepository(db)
+	ctx := context.Background()
+	filters := dto.NovelaFilters{Search: "monarch", Limit: 20}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+		if err != nil {
+			b.Fatal(err)
+		}
+		if _, _, err := repo.GetNovelas(tx, ctx, 0, filters); err != nil {
+			_ = tx.Rollback()
+			b.Fatal(err)
+		}
+		_ = tx.Rollback()
+	}
+}
+
 func BenchmarkTgPostList(b *testing.B) {
 	db := benchDB(b)
 	repo := NewTgPostRepository(db)

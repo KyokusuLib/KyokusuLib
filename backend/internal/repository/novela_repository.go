@@ -592,7 +592,9 @@ func (r *NovelaRepository) GetNovelas(tx *sql.Tx, ctx context.Context, userID in
 	argID++
 
 	if f.Search != "" {
-		where = append(where, fmt.Sprintf("(n.title ILIKE $%d::text OR $%d::text ILIKE ANY(n.alternative_titles))", argID, argID))
+		// novela_search_text() is backed by a trigram GIN index; keep this
+		// expression in sync with the index definition in migrations.
+		where = append(where, fmt.Sprintf("novela_search_text(n.title::text, n.alternative_titles) ILIKE $%d::text", argID))
 		args = append(args, "%"+f.Search+"%")
 		argID++
 	}
