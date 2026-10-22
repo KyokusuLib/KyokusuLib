@@ -11,7 +11,8 @@
     "tg-bot": "cd apps/kyokusu-tg-bot && bun run start",
     "cli-build": "cd cli && go build -o ../kyokusu-cli",
     "cli": "bun run cli-build && ./kyokusu-cli",
-    "backup": "bun run cli-build && ./kyokusu-cli dmp postgres -env ./backend/.env"
+    "backup": "bun run cli-build && ./kyokusu-cli dmp postgres -env ./backend/.env",
+    "kill": "bun run cli-build && ./kyokusu-cli kill -p 8080"
   },
   "devDependencies": {
     "@types/bun": "latest"
