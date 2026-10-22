@@ -22,14 +22,14 @@ export function useChapterList(volumes: Ref<NovelaVolume[]>) {
   })
 
   const chapterCount = computed(() => {
-    return volumes.value.reduce((acc, v) => acc + (v.chapters?.length || 0), 0)
+    return volumes.value.reduce((acc, v) => acc + (v.chapters_count ?? v.chapters?.length ?? 0), 0)
   })
 
   watch(volumes, (list) => {
     if (!list.length) return
     const stillExists = list.some((v) => v.id === activeVolumeId.value)
     if (!stillExists) {
-      activeVolumeId.value = list[0].id
+      activeVolumeId.value = list[0]!.id
     }
   })
 
@@ -42,7 +42,7 @@ export function useChapterList(volumes: Ref<NovelaVolume[]>) {
   }
 
   if (volumes.value.length > 0 && !activeVolumeId.value) {
-    activeVolumeId.value = volumes.value[0].id
+    activeVolumeId.value = volumes.value[0]!.id
   }
 
   return {

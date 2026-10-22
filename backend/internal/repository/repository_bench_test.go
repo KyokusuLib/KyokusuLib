@@ -47,11 +47,54 @@ func BenchmarkNovelaGetFullByID(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		if _, err := repo.GetFullByID(tx, ctx, benchNovelaID, 0); err != nil {
+		if _, err := repo.GetFullByID(tx, ctx, benchNovelaID, 0, true); err != nil {
 			_ = tx.Rollback()
 			b.Fatal(err)
 		}
 		_ = tx.Rollback()
+	}
+}
+
+func BenchmarkNovelaGetSummaryByID(b *testing.B) {
+	db := benchDB(b)
+	repo := NewNovelaRepository(db)
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+		if err != nil {
+			b.Fatal(err)
+		}
+		if _, err := repo.GetFullByID(tx, ctx, benchNovelaID, 0, false); err != nil {
+			_ = tx.Rollback()
+			b.Fatal(err)
+		}
+		_ = tx.Rollback()
+	}
+}
+
+func BenchmarkNovelaGetVolumeChapters(b *testing.B) {
+	db := benchDB(b)
+	repo := NewNovelaRepository(db)
+	ctx := context.Background()
+
+	var volumeID string
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM novela_volumes WHERE novela_id = $1 AND status = 'approved' ORDER BY volume_number LIMIT 1`,
+		benchNovelaID,
+	).Scan(&volumeID)
+	if err != nil {
+		b.Skipf("no approved volume for novela %d: %v", benchNovelaID, err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := repo.GetVolumeChapters(ctx, volumeID, 0); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -69,7 +112,7 @@ func BenchmarkNovelaPage(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		novela, err := novelaRepo.GetFullByID(tx, ctx, benchNovelaID, 0)
+		novela, err := novelaRepo.GetFullByID(tx, ctx, benchNovelaID, 0, true)
 		if err != nil {
 			_ = tx.Rollback()
 			b.Fatal(err)

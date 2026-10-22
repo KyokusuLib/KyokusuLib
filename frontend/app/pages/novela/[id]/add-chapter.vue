@@ -147,15 +147,15 @@ async function onSubmit() {
     if (novela.value) {
       const volume = novela.value.volumes.find((v) => v.id === selectedVolumeId.value)
       if (volume) {
+        const previousCount = volume.chapters_count ?? volume.chapters.length
         const newChapter: NovelaChapter = {
           id: res.id,
           title: chapterTitle.value || `Глава ${chapterNumber.value}`,
           number: chapterNumber.value,
           status: res.status,
-          content: '',
-          images: [],
         }
         volume.chapters.push(newChapter)
+        volume.chapters_count = previousCount + 1
       }
     }
     router.push(`/novela/${novelaId}`)

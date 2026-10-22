@@ -5,6 +5,7 @@ import ChapterListItem from './ChapterListItem.vue'
 defineProps<{
   chapters: NovelaChapter[]
   novelaId: number
+  isLoading?: boolean
 }>()
 </script>
 
@@ -12,14 +13,18 @@ defineProps<{
   <div
     class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden max-h-150 overflow-y-auto custom-scrollbar"
   >
-    <ChapterListItem
-      v-for="chapter in chapters"
-      :key="chapter.id"
-      :chapter="chapter"
-      :novela-id="novelaId"
-    />
+    <div v-if="isLoading" class="p-8 text-center text-zinc-500">Загрузка глав...</div>
 
-    <div v-if="!chapters.length" class="p-8 text-center text-zinc-500">Главы не найдены</div>
+    <template v-else>
+      <ChapterListItem
+        v-for="chapter in chapters"
+        :key="chapter.id"
+        :chapter="chapter"
+        :novela-id="novelaId"
+      />
+
+      <div v-if="!chapters.length" class="p-8 text-center text-zinc-500">Главы не найдены</div>
+    </template>
   </div>
 </template>
 

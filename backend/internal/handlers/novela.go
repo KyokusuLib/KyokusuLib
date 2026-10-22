@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/lanxre/kyokusulib/internal/constants"
 	"github.com/lanxre/kyokusulib/internal/middleware"
@@ -37,7 +38,12 @@ func (h *NovelaHandler) GetNovela(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 
-	novela, err := h.service.GetNovelaById(r.Context(), id, userID)
+	includeChapters := true
+	if summary, err := strconv.ParseBool(r.URL.Query().Get("summary")); err == nil && summary {
+		includeChapters = false
+	}
+
+	novela, err := h.service.GetNovelaById(r.Context(), id, userID, includeChapters)
 	if err != nil {
 		if errors.Is(err, service.ErrNovelaNotFound) {
 			response.Error(w, http.StatusNotFound, err.Error())
@@ -47,6 +53,23 @@ func (h *NovelaHandler) GetNovela(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusOK, novela)
+}
+
+func (h *NovelaHandler) GetVolumeChapters(w http.ResponseWriter, r *http.Request) {
+	volumeID := mux.Vars(r)["id"]
+	if _, err := uuid.Parse(volumeID); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid volume id")
+		return
+	}
+	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+
+	chapters, err := h.service.GetVolumeChapters(r.Context(), volumeID, userID)
+	if err != nil {
+		log.Printf("get volume chapters: %v", err)
+		response.Error(w, http.StatusInternalServerError, "Failed to load chapters")
+		return
+	}
+	response.JSON(w, http.StatusOK, chapters)
 }
 
 func (h *NovelaHandler) CreateNovela(w http.ResponseWriter, r *http.Request) {

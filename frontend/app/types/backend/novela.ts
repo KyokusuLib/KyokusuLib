@@ -26,8 +26,6 @@ export interface NovelaChapter {
   is_read?: boolean
   status?: string
   created_by?: number
-  content: string
-  images: NovelaChapterImage[]
 }
 
 export interface NovelaVolume {
@@ -36,6 +34,7 @@ export interface NovelaVolume {
   number: number
   status?: string
   created_by?: number
+  chapters_count?: number
   chapters: NovelaChapter[]
 }
 
@@ -99,6 +98,7 @@ export interface NovelaDetails {
   bookmark_details: NovelaBookmarkCategory
   country: string
   last_readed?: NovelaLastReaded
+  first_chapter_id?: string | null
 }
 
 export interface NovelaLastReaded {

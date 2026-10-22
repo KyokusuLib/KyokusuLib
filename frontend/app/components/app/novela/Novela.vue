@@ -57,7 +57,7 @@ const activeTab = ref<NovelaActiveTabs>(
     : NovelaActiveTabsEnum.ABOUT,
 )
 
-await useAsyncData(`novela-${novelaId.value}`, () => fetchNovela(novelaId.value))
+await useAsyncData(`novela-${novelaId.value}`, () => fetchNovela(novelaId.value, { summary: true }))
 
 await useAsyncData(`novela-comments-${novelaId.value}`, () => fetchComments(Number(novelaId.value)))
 
@@ -91,7 +91,10 @@ const openedSections = ref<string[]>([])
 
 const totalChapters = computed(() => {
   if (!novela.value) return 0
-  return novela.value.volumes.reduce((acc, v) => acc + (v.chapters?.length || 0), 0)
+  return novela.value.volumes.reduce(
+    (acc, v) => acc + (v.chapters_count ?? v.chapters?.length ?? 0),
+    0,
+  )
 })
 
 const novelaInfo = computed(() => [
@@ -269,6 +272,7 @@ function onVolumeAdded(volumeData?: {
       title: volumeData.title,
       number: volumeData.number,
       status: volumeData.status,
+      chapters_count: 0,
       chapters: [],
     }
     novela.value.volumes.push(newVolume)

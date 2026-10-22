@@ -7,7 +7,7 @@ const (
 	SortPopular  NovelaSort = "popular"
 	SortRating   NovelaSort = "rating"
 	SortUpdated  NovelaSort = "updated"
-	SortTrending NovelaSort = "trending" 
+	SortTrending NovelaSort = "trending"
 )
 
 type CreateNovelaDTO struct {
@@ -19,9 +19,9 @@ type CreateNovelaDTO struct {
 	Status            string `validate:"required"`
 	TranslationStatus string `validate:"required"`
 	Country           string `validate:"required"`
-	
-	Genres            []string `validate:"required,min=1"`
-	Categories        []string `validate:"required,min=1"`
+
+	Genres     []string `validate:"required,min=1"`
+	Categories []string `validate:"required,min=1"`
 }
 
 type NovelaResponse struct {
@@ -48,24 +48,25 @@ type NovelaResponse struct {
 	RatingDetails     NovelaRatingCategory   `json:"rating_details"`
 	BookmarkDetails   NovelaBookmarkCategory `json:"bookmark_details"`
 
-	LastReaded 		  *NovelaLastReaded `json:"last_readed"`
+	LastReaded     *NovelaLastReaded `json:"last_readed"`
+	FirstChapterID *string           `json:"first_chapter_id"`
 }
 
 type NovelaLastReaded struct {
-	ChapterID      *string  `json:"chapter_id,omitempty"`
-	ChapterNumber  *float64 `json:"chapter_number,omitempty"`
-	ChapterScroll  *int     `json:"chapter_scroll,omitempty"`
+	ChapterID     *string  `json:"chapter_id,omitempty"`
+	ChapterNumber *float64 `json:"chapter_number,omitempty"`
+	ChapterScroll *int     `json:"chapter_scroll,omitempty"`
 }
 
 type NovelaRatingCategory struct {
-	Total        int       `json:"total"`
-	TotalRating float64   `json:"total_rating"`
-	NCItems      []NCItem  `json:"nc_items"`
+	Total       int      `json:"total"`
+	TotalRating float64  `json:"total_rating"`
+	NCItems     []NCItem `json:"nc_items"`
 }
 
 type NovelaBookmarkCategory struct {
-	Total        int       `json:"total"`
-	NCItems      []NCItem  `json:"nc_items"`
+	Total   int      `json:"total"`
+	NCItems []NCItem `json:"nc_items"`
 }
 
 type NCItem struct {
@@ -80,19 +81,18 @@ type NovelaAuthor struct {
 }
 
 type NovelaVolume struct {
-	ID       string          `json:"id"`
-	Title    string          `json:"title"`
-	Number   int             `json:"number"`
-	Chapters []NovelaChapter `json:"chapters"`
+	ID            string          `json:"id"`
+	Title         string          `json:"title"`
+	Number        int             `json:"number"`
+	ChaptersCount int             `json:"chapters_count"`
+	Chapters      []NovelaChapter `json:"chapters"`
 }
 
 type NovelaChapter struct {
-	ID     string    `json:"id"`
-	Title  string `json:"title"`
+	ID     string  `json:"id"`
+	Title  string  `json:"title"`
 	Number float64 `json:"number"`
-	IsRead bool   `json:"is_read,omitempty"`
-	Content string `json:"content,omitempty"`
-	Images  []NovelaChapterImage `json:"images"`
+	IsRead bool    `json:"is_read,omitempty"`
 }
 
 type NovelaChapterImage struct {
@@ -121,11 +121,11 @@ type NovelaFilters struct {
 	Search            string     `json:"search"`
 	Genres            []string   `json:"genres"`
 	Categories        []string   `json:"categories"`
-	Country			  []string 	 `json:"country"`
+	Country           []string   `json:"country"`
 	Type              string     `json:"type"`
 	Status            string     `json:"status"`
 	TranslationStatus string     `json:"translation_status"`
-	AgeRating	  	  string     `json:"ageRating"`
+	AgeRating         string     `json:"ageRating"`
 	ChaptersFrom      int        `json:"chapters_from"`
 	ChaptersTo        int        `json:"chapters_to"`
 	YearFrom          int        `json:"year_from"`
@@ -137,11 +137,11 @@ type NovelaFilters struct {
 }
 
 type UserNovelaBookmark struct {
-	ID     		int    		`json:"id"`
-	Title  		string 		`json:"title"`
-	PosterURL 	string 		`json:"poster_url"`
-	Type 		string 		`json:"type"`
-	Rating     	float64     `json:"rating"`
+	ID        int     `json:"id"`
+	Title     string  `json:"title"`
+	PosterURL string  `json:"poster_url"`
+	Type      string  `json:"type"`
+	Rating    float64 `json:"rating"`
 }
 
 type AddNovelaTeamRequest struct {
@@ -222,6 +222,6 @@ type ChapterReaderResponse struct {
 }
 
 type MostSearchedResponse struct {
-	Genres    []string `json:"genres"`
+	Genres     []string `json:"genres"`
 	Categories []string `json:"categories"`
 }

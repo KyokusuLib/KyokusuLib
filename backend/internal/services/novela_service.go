@@ -92,14 +92,14 @@ func initStrategies(
 	return strategies
 }
 
-func (s *NovelaService) GetNovelaById(ctx context.Context, id, userID int) (dto.NovelaResponse, error) {
+func (s *NovelaService) GetNovelaById(ctx context.Context, id, userID int, includeChapters bool) (dto.NovelaResponse, error) {
 	tx, err := s.Repo.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return dto.NovelaResponse{}, err
 	}
 	defer tx.Rollback()
 
-	novela, err := s.Repo.GetFullByID(tx, ctx, id, userID)
+	novela, err := s.Repo.GetFullByID(tx, ctx, id, userID, includeChapters)
 	if err != nil || novela == nil {
 		return dto.NovelaResponse{}, ErrNovelaNotFound
 	}
@@ -306,15 +306,17 @@ func (s *NovelaService) novelaToDto(n *db.Novela) dto.NovelaResponse {
 
 	volumes := make([]dto.NovelaVolume, 0)
 	for _, v := range n.Volumes {
-		chapters := make([]dto.NovelaChapter, 0)
+		chapters := make([]dto.NovelaChapter, 0, len(v.Chapters))
 		for _, ch := range v.Chapters {
-			imgs := make([]dto.NovelaChapterImage, 0)
-			for _, img := range ch.Images {
-				imgs = append(imgs, dto.NovelaChapterImage{ID: img.ID, ImageURL: img.ImageURL, Caption: img.Caption, Position: img.Position})
-			}
-			chapters = append(chapters, dto.NovelaChapter{ID: ch.ID, Title: ch.Title, Number: ch.Number, Images: imgs, IsRead: ch.IsRead})
+			chapters = append(chapters, dto.NovelaChapter{ID: ch.ID, Title: ch.Title, Number: ch.Number, IsRead: ch.IsRead})
 		}
-		volumes = append(volumes, dto.NovelaVolume{ID: v.ID, Title: v.Title, Number: v.Number, Chapters: chapters})
+		volumes = append(volumes, dto.NovelaVolume{
+			ID:            v.ID,
+			Title:         v.Title,
+			Number:        v.Number,
+			ChaptersCount: v.ChaptersCount,
+			Chapters:      chapters,
+		})
 	}
 
 	var bookmark *string
@@ -339,7 +341,8 @@ func (s *NovelaService) novelaToDto(n *db.Novela) dto.NovelaResponse {
 		Country: n.Country, Views: n.Views, Genres: n.Genres, Categories: n.Categories,
 		Authors: authors, Volumes: volumes, Bookmark: bookmark, HasLiked: n.HasLiked,
 		LikeCount: n.LikeCount, UserRating: n.UserRating,
-		LastReaded: &dto.NovelaLastReaded{ChapterID: lastReadChapterID, ChapterNumber: lastReadChapterNumber, ChapterScroll: lastReadChapterScroll},
+		LastReaded:     &dto.NovelaLastReaded{ChapterID: lastReadChapterID, ChapterNumber: lastReadChapterNumber, ChapterScroll: lastReadChapterScroll},
+		FirstChapterID: n.FirstChapterID,
 	}
 }
 
@@ -498,6 +501,19 @@ func (s *NovelaService) AddChapterImages(ctx context.Context, chapterID string, 
 
 func (s *NovelaService) GetChapterReaderDetails(ctx context.Context, chapterID string, userID int) (*dto.ChapterReaderResponse, error) {
 	return s.Repo.GetChapterReaderDetails(ctx, chapterID, userID)
+}
+
+func (s *NovelaService) GetVolumeChapters(ctx context.Context, volumeID string, userID int) ([]dto.NovelaChapter, error) {
+	chapters, err := s.Repo.GetVolumeChapters(ctx, volumeID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]dto.NovelaChapter, 0, len(chapters))
+	for _, ch := range chapters {
+		res = append(res, dto.NovelaChapter{ID: ch.ID, Title: ch.Title, Number: ch.Number, IsRead: ch.IsRead})
+	}
+	return res, nil
 }
 
 func (s *NovelaService) SaveChapterReadPosition(ctx context.Context, userID int, req dto.SaveReadPositionRequest) error {

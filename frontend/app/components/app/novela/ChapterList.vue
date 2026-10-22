@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ModalConfirm from '~/components/common/ModalConfirm.vue'
 import { useNovela } from '~/composables/api/novela/useNovela'
 import { useChapterList } from '~/composables/ui/useChapterList'
@@ -27,11 +27,31 @@ const router = useRouter()
 const { activeVolumeId, searchQuery, sortedVolumes, filteredChapters, setActiveVolume } =
   useChapterList(computed(() => props.volumes))
 
-const { deleteVolume } = useNovela()
+const { deleteVolume, fetchVolumeChapters } = useNovela()
 const showAddVolumeModal = ref(false)
 const showDeleteVolumeConfirm = ref(false)
+const loadingVolumeId = ref<string | null>(null)
 
 const activeVolume = computed(() => sortedVolumes.value.find((v) => v.id === activeVolumeId.value))
+const isChaptersLoading = computed(() => loadingVolumeId.value === activeVolumeId.value)
+
+watch(
+  activeVolume,
+  async (volume) => {
+    if (!volume) return
+    if (volume.chapters.length > 0) return
+    if ((volume.chapters_count ?? 0) === 0) return
+    if (loadingVolumeId.value === volume.id) return
+
+    loadingVolumeId.value = volume.id
+    try {
+      await fetchVolumeChapters(volume.id)
+    } finally {
+      if (loadingVolumeId.value === volume.id) loadingVolumeId.value = null
+    }
+  },
+  { immediate: true },
+)
 
 function goToAddChapter() {
   router.push(`/novela/${props.novelaId}/add-chapter`)
@@ -72,7 +92,11 @@ async function confirmDeleteVolume() {
       </button>
     </div>
 
-    <ChapterListContent :chapters="filteredChapters" :novela-id="novelaId" />
+    <ChapterListContent
+      :chapters="filteredChapters"
+      :novela-id="novelaId"
+      :is-loading="isChaptersLoading"
+    />
 
     <NovelaAddVolumeModal
       v-if="canManage"

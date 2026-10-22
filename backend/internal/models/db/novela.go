@@ -17,26 +17,27 @@ type Novela struct {
 	PosterURL         string    `json:"poster_url"`
 	Country           string    `json:"country"`
 	Views             int       `json:"views"`
-	
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
 
-	Genres            []string       `json:"genres"`
-	Categories        []string       `json:"categories"`
-	Authors           []NovelaAuthor `json:"authors"`
-	Volumes           []NovelaVolume `json:"volumes"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
-	Rating            float64 `json:"rating"`
-	RatingCount       int     `json:"rating_count"`
-	UserRating        int     `json:"user_rating"`
+	Genres     []string       `json:"genres"`
+	Categories []string       `json:"categories"`
+	Authors    []NovelaAuthor `json:"authors"`
+	Volumes    []NovelaVolume `json:"volumes"`
 
-	Bookmark          *BookmarkCategory `json:"bookmark"`
-	BookmarkCount     int               `json:"bookmark_count"`
+	Rating      float64 `json:"rating"`
+	RatingCount int     `json:"rating_count"`
+	UserRating  int     `json:"user_rating"`
 
-	HasLiked          bool `json:"has_liked"`
-	LikeCount         int  `json:"like_count"`
+	Bookmark      *BookmarkCategory `json:"bookmark"`
+	BookmarkCount int               `json:"bookmark_count"`
 
-	LastReadChapter   *LastReadChapter `json:"last_read_chapter"`
+	HasLiked  bool `json:"has_liked"`
+	LikeCount int  `json:"like_count"`
+
+	LastReadChapter *LastReadChapter `json:"last_read_chapter"`
+	FirstChapterID  *string          `json:"first_chapter_id"`
 }
 
 type NovelaAuthor struct {
@@ -46,12 +47,13 @@ type NovelaAuthor struct {
 }
 
 type NovelaVolume struct {
-	ID        string          `json:"id"`
-	Title     string          `json:"title"`
-	Number    int             `json:"number"`
-	Status    string          `json:"status"`
-	CreatedBy int             `json:"created_by"`
-	Chapters  []NovelaChapter `json:"chapters"`
+	ID            string          `json:"id"`
+	Title         string          `json:"title"`
+	Number        int             `json:"number"`
+	Status        string          `json:"status"`
+	CreatedBy     int             `json:"created_by"`
+	ChaptersCount int             `json:"chapters_count"`
+	Chapters      []NovelaChapter `json:"chapters"`
 }
 
 type NovelaChapter struct {
@@ -79,9 +81,9 @@ type NovelaLike struct {
 }
 
 type NovelaRating struct {
-	NovelaID int  `json:"novela_id"`
-	UserID   int  `json:"user_id"`
-	Rating   int  `json:"rating"`
+	NovelaID int `json:"novela_id"`
+	UserID   int `json:"user_id"`
+	Rating   int `json:"rating"`
 }
 
 type NovelaRatingSummary struct {
@@ -91,27 +93,27 @@ type NovelaRatingSummary struct {
 }
 
 type NovelaTotalRaing struct {
-	Total 	   int 			  `json:"total"`
-	TotalRaing float64		  `json:"total_rating"`
-	Rating []NovelaRatingItem `json:"rating"`
+	Total      int                `json:"total"`
+	TotalRaing float64            `json:"total_rating"`
+	Rating     []NovelaRatingItem `json:"rating"`
 }
 
 type NovelaRatingItem struct {
 	Value interface{} `json:"value"`
-	Count int		  `json:"count"`
+	Count int         `json:"count"`
 }
 
 type NovelaBookmarkSummary struct {
-	TotalCount    int
-	Distribution  map[string]int
+	TotalCount   int
+	Distribution map[string]int
 }
 
 type UserNovelaBookmark struct {
-	ID     		int    		`json:"id"`
-	Title  		string 		`json:"title"`
-	PosterURL 	string 		`json:"poster_url"`
-	Type 		string 		`json:"type"`
-	Rating     	float64     `json:"rating"`
+	ID        int     `json:"id"`
+	Title     string  `json:"title"`
+	PosterURL string  `json:"poster_url"`
+	Type      string  `json:"type"`
+	Rating    float64 `json:"rating"`
 }
 
 type ReadChapter struct {

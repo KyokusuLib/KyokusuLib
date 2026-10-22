@@ -1,4 +1,4 @@
-import type { NovelaDetails } from '@/types/backend/novela'
+import type { NovelaChapter, NovelaDetails } from '@/types/backend/novela'
 import { $api } from '@/composables/api/useApi'
 import { useNotificationStore } from '@/stores/notification'
 import type { NovelsQueryParams } from '@/types/frontend/query/novela-query'
@@ -6,6 +6,7 @@ import type { NovelaFilters } from '@/types/frontend/novela/novela-filters'
 
 export function useNovela() {
   const novela = useState<NovelaDetails | null>('novela-data', () => null)
+  const novelaIsSummary = useState<boolean>('novela-data-summary', () => false)
 
   const { notify } = useNotificationStore()
 
@@ -36,16 +37,32 @@ export function useNovela() {
     }
   }
 
-  const fetchNovela = async (id: string | number) => {
+  const fetchNovela = async (id: string | number, options: { summary?: boolean } = {}) => {
     isLoading.value = true
     try {
-      const data = await $api<NovelaDetails>(`/api/novela/${id}`)
+      const query = options.summary ? '?summary=1' : ''
+      const data = await $api<NovelaDetails>(`/api/novela/${id}${query}`)
       novela.value = data
+      novelaIsSummary.value = !!options.summary
       return data
     } catch (e) {
       handleError(e, 'Не удалось загрузить данные новеллы')
     } finally {
       isLoading.value = false
+    }
+  }
+
+  const fetchVolumeChapters = async (volumeId: string) => {
+    try {
+      const chapters = await $api<NovelaChapter[]>(`/api/novela/volumes/${volumeId}/chapters`)
+      if (novela.value) {
+        const volume = novela.value.volumes.find((v) => v.id === volumeId)
+        if (volume) volume.chapters = chapters
+      }
+      return chapters
+    } catch (e) {
+      handleError(e, 'Не удалось загрузить главы тома')
+      return []
     }
   }
 
@@ -68,7 +85,7 @@ export function useNovela() {
         content: 'Новелла успешно обновлена',
       })
 
-      await fetchNovela(id)
+      await fetchNovela(id, { summary: true })
     } catch (e) {
       handleError(e, 'Ошибка при обновлении новеллы')
     } finally {
@@ -174,10 +191,15 @@ export function useNovela() {
       if (novela.value) {
         novela.value = {
           ...novela.value,
-          volumes: novela.value.volumes.map((volume) => ({
-            ...volume,
-            chapters: volume.chapters.filter((c) => c.id !== chapterId),
-          })),
+          volumes: novela.value.volumes.map((volume) => {
+            const removed = volume.chapters.some((c) => c.id === chapterId)
+            if (!removed) return volume
+            return {
+              ...volume,
+              chapters: volume.chapters.filter((c) => c.id !== chapterId),
+              chapters_count: Math.max(0, (volume.chapters_count ?? volume.chapters.length) - 1),
+            }
+          }),
         }
       }
       notify({
@@ -209,7 +231,7 @@ export function useNovela() {
           volumes: novela.value.volumes.map((volume) => ({
             ...volume,
             chapters: volume.chapters.map((c) =>
-              c.id === chapterId ? { ...c, title, number: chapterNumber, content } : c,
+              c.id === chapterId ? { ...c, title, number: chapterNumber } : c,
             ),
           })),
         }
@@ -226,9 +248,11 @@ export function useNovela() {
 
   return {
     novela,
+    novelaIsSummary,
     isLoading,
     isUpdating,
     fetchNovela,
+    fetchVolumeChapters,
     fetchNovels,
     updateNovela,
     addVolume,

@@ -81,7 +81,7 @@ func (r *NovelaRepository) Create(ctx context.Context, n *db.Novela) error {
 	return tx.Commit()
 }
 
-func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, userID int) (*db.Novela, error) {
+func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, userID int, includeChapters bool) (*db.Novela, error) {
 	n := &db.Novela{}
 	var (
 		authorsJSON     []byte
@@ -89,6 +89,7 @@ func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, user
 		userRating      sql.NullInt32
 		bookmark        sql.NullString
 		lastReadChapter sql.NullString
+		firstChapterID  sql.NullString
 	)
 
 	query := `
@@ -133,21 +134,20 @@ func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, user
 						'id', v.id,
 						'title', v.title,
 						'number', v.volume_number,
+						'chapters_count', (
+							SELECT COUNT(*)
+							FROM novela_chapters ch
+							WHERE ch.novela_volume_id = v.id AND ch.status = 'approved'
+						),
 						'chapters', COALESCE((
 							SELECT json_agg(
 								json_build_object(
 									'id', ch.id,
 									'title', ch.title,
 									'number', ch.chapter_number,
-									'is_read', CASE WHEN $2 > 0 THEN COALESCE((SELECT true FROM read_chapters rc WHERE rc.chapter_id = ch.id AND rc.user_id = $2), false) ELSE false END,
-									'images', COALESCE((
-										SELECT json_agg(
-											json_build_object('id', img.id, 'image_url', img.image_url, 'caption', img.caption, 'position', img.position)
-											ORDER BY img.position ASC
-										) FROM novela_chapter_images img WHERE img.chapter_id = ch.id
-									), '[]'::json)
+									'is_read', CASE WHEN $2 > 0 THEN COALESCE((SELECT true FROM read_chapters rc WHERE rc.chapter_id = ch.id AND rc.user_id = $2), false) ELSE false END
 								) ORDER BY ch.chapter_number
-							) FROM novela_chapters ch WHERE ch.novela_volume_id = v.id AND ch.status = 'approved'
+							) FROM novela_chapters ch WHERE ch.novela_volume_id = v.id AND ch.status = 'approved' AND $3::boolean
 						), '[]'::json)
 					) ORDER BY v.volume_number
 				) FROM novela_volumes v WHERE v.novela_id = n.id AND v.status = 'approved'
@@ -181,12 +181,21 @@ func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, user
 					LIMIT 1
 				)
 				ELSE NULL
-			END as last_read_chapter
+			END as last_read_chapter,
+
+			(
+				SELECT ch.id
+				FROM novela_chapters ch
+				JOIN novela_volumes v ON v.id = ch.novela_volume_id
+				WHERE v.novela_id = n.id AND v.status = 'approved' AND ch.status = 'approved'
+				ORDER BY v.volume_number, ch.chapter_number
+				LIMIT 1
+			) as first_chapter_id
 
 		FROM novela n
 		WHERE n.id = $1`
 
-	err := tx.QueryRowContext(ctx, query, id, userID).Scan(
+	err := tx.QueryRowContext(ctx, query, id, userID, includeChapters).Scan(
 		&n.ID,
 		&n.Title,
 		pq.Array(&n.AlternativeTitles),
@@ -208,6 +217,7 @@ func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, user
 		&n.LikeCount,
 		&userRating,
 		&lastReadChapter,
+		&firstChapterID,
 	)
 
 	if err != nil {
@@ -245,7 +255,42 @@ func (r *NovelaRepository) GetFullByID(tx *sql.Tx, ctx context.Context, id, user
 		n.LastReadChapter = &lc
 	}
 
+	if firstChapterID.Valid {
+		n.FirstChapterID = &firstChapterID.String
+	}
+
 	return n, nil
+}
+
+func (r *NovelaRepository) GetVolumeChapters(ctx context.Context, volumeID string, userID int) ([]db.NovelaChapter, error) {
+	query := `
+		SELECT ch.id, ch.title, ch.chapter_number,
+			CASE WHEN $2 > 0 THEN COALESCE((SELECT true FROM read_chapters rc WHERE rc.chapter_id = ch.id AND rc.user_id = $2), false) ELSE false END
+		FROM novela_chapters ch
+		JOIN novela_volumes v ON v.id = ch.novela_volume_id
+		WHERE ch.novela_volume_id = $1 AND ch.status = 'approved' AND v.status = 'approved'
+		ORDER BY ch.chapter_number`
+
+	rows, err := r.DB.QueryContext(ctx, query, volumeID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	chapters := make([]db.NovelaChapter, 0)
+	for rows.Next() {
+		var ch db.NovelaChapter
+		if err := rows.Scan(&ch.ID, &ch.Title, &ch.Number, &ch.IsRead); err != nil {
+			return nil, err
+		}
+		ch.VolumeID = volumeID
+		chapters = append(chapters, ch)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return chapters, nil
 }
 
 func (r *NovelaRepository) UpdateFull(ctx context.Context, n *db.Novela) error {

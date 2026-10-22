@@ -12,14 +12,14 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
 }>()
 
-const { novela, fetchNovela, isLoading } = useNovela()
+const { novela, novelaIsSummary, fetchNovela, isLoading } = useNovela()
 
 const close = () => emit('update:modelValue', false)
 
 watch(
   () => props.modelValue,
   (isOpen) => {
-    if (isOpen && !novela.value) {
+    if (isOpen && (!novela.value || novela.value.id !== props.novelaId || novelaIsSummary.value)) {
       fetchNovela(props.novelaId)
     }
 

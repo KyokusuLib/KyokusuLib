@@ -26,6 +26,10 @@ export function useReadProgress() {
   }
 
   function getFirstChapterId(novela: NovelaDetails): string | null {
+    if (novela.first_chapter_id) {
+      return novela.first_chapter_id
+    }
+
     const firstVolume = novela.volumes?.[0]
 
     if (!firstVolume?.chapters?.length) {
