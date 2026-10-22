@@ -13,7 +13,7 @@ func (a *NovelaRoutes) Register(cfg *config.Config, r *mux.Router) {
 
 	novelaRouter.Handle("/novela", middleware.DefaultMiddleware(http.HandlerFunc(a.Handler.GetNovelas), cfg.JWTSecret)).Methods("GET")
 	novelaRouter.Handle("/novela/{id:[0-9]+}", middleware.DefaultMiddleware(http.HandlerFunc(a.Handler.GetNovela), cfg.JWTSecret)).Methods("GET")
-	novelaRouter.Handle("/novela/{id:[0-9]+}", middleware.DefaultMiddleware(http.HandlerFunc(a.Handler.UpdateNovela), cfg.JWTSecret)).Methods("PUT")
+	novelaRouter.Handle("/novela/{id:[0-9]+}", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.UpdateNovela), cfg.JWTSecret)).Methods("PUT")
 	novelaRouter.Handle("/novela/{id:[0-9]+}", middleware.AuthMiddleware(middleware.RoleGuard(a.Handler.DeleteNovela, middleware.RoleAdmin), cfg.JWTSecret)).Methods("DELETE")
 
 	novelaRouter.Handle("/novela", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.CreateNovela), cfg.JWTSecret)).Methods("POST")
@@ -34,7 +34,7 @@ func (a *NovelaRoutes) Register(cfg *config.Config, r *mux.Router) {
 	novelaRouter.Handle("/novela/{id:[0-9]+}/teams", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.AddTeamToNovela), cfg.JWTSecret)).Methods("POST")
 	novelaRouter.Handle("/novela/{id:[0-9]+}/volumes", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.AddVolume), cfg.JWTSecret)).Methods("POST")
 	novelaRouter.Handle("/novela/chapter/{id:[a-fA-F0-9-]+}/mark-as-read", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.MarkChapterAsRead), cfg.JWTSecret)).Methods("POST")
-	
+
 	novelaRouter.Handle("/novela/volumes/{id:[a-fA-F0-9-]+}", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.DeleteVolume), cfg.JWTSecret)).Methods("DELETE")
 	novelaRouter.Handle("/novela/volumes/{id:[a-fA-F0-9-]+}/chapters", middleware.AuthMiddleware(http.HandlerFunc(a.Handler.AddChapter), cfg.JWTSecret)).Methods("POST")
 	novelaRouter.Handle("/novela/chapters/{id:[a-fA-F0-9-]+}", middleware.DefaultMiddleware(http.HandlerFunc(a.Handler.GetChapter), cfg.JWTSecret)).Methods("GET")

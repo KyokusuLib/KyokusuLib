@@ -29,7 +29,7 @@ type NovelaService struct {
 	UserProfileRepo     *repository.UserProfileRepository
 	UserTagRepo         *repository.UserTagRepository
 	NotificationService *NotificationService
-	redis          		*redis.Client
+	redis               *redis.Client
 	awardStrategies     []strategy.AwardStrategy
 }
 
@@ -45,7 +45,7 @@ func NewNovelaService(repo *repository.NovelaRepository,
 ) *NovelaService {
 
 	ctx := context.Background()
-	
+
 	return &NovelaService{
 		Repo:                repo,
 		RatingRepo:          novelaRatingRepo,
@@ -95,7 +95,7 @@ func initStrategies(
 func (s *NovelaService) GetNovelaById(ctx context.Context, id, userID int) (dto.NovelaResponse, error) {
 	tx, err := s.Repo.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return dto.NovelaResponse{}	, err
+		return dto.NovelaResponse{}, err
 	}
 	defer tx.Rollback()
 
@@ -161,7 +161,35 @@ func (s *NovelaService) SetRating(ctx context.Context, userID int, req dto.Updat
 	})
 }
 
-func (s *NovelaService) UpdateNovela(ctx context.Context, id int, req dto.UpdateNovelaRequest, posterURL string) error {
+func (s *NovelaService) AuthorizeNovelaEdit(ctx context.Context, id, userID int) error {
+	user, err := s.UserRepo.GetByID(userID)
+	if err != nil {
+		return ErrInternal
+	}
+	if user == nil {
+		return ErrForbidden
+	}
+
+	if user.Role == "admin" || user.Role == "moderator" {
+		return nil
+	}
+
+	allowed, err := s.Repo.CheckUserNovelaTeamPermission(ctx, userID, id)
+	if err != nil {
+		return ErrInternal
+	}
+	if !allowed {
+		return ErrForbidden
+	}
+
+	return nil
+}
+
+func (s *NovelaService) UpdateNovela(ctx context.Context, id, userID int, req dto.UpdateNovelaRequest, posterURL string) error {
+	if err := s.AuthorizeNovelaEdit(ctx, id, userID); err != nil {
+		return err
+	}
+
 	releaseDate, _ := time.Parse("2006", req.ReleaseDate)
 	novela := &db.Novela{
 		ID:                id,
@@ -186,7 +214,7 @@ func (s *NovelaService) UpdateNovela(ctx context.Context, id int, req dto.Update
 	err := s.Repo.UpdateFull(ctx, novela)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return errors.ErrUnsupported
+			return ErrNovelaNotFound
 		}
 		return ErrInternal
 	}
@@ -542,7 +570,7 @@ func (s *NovelaService) MarkChapterAsRead(ctx context.Context, userID int, chapt
 			return nil, err
 		}
 	}
-	
+
 	dataLevel, err := s.UpLevelForReading(ctx, userID)
 	if err := s.AwardUser(ctx, userID, strategy.EventReadChapter, nil); err != nil {
 		return nil, err
@@ -593,7 +621,7 @@ func (s *NovelaService) GetMostSearched(ctx context.Context, limit int) (*dto.Mo
 			}
 		}
 	}
-	
+
 	genres, err := s.Repo.GetMostSearchedGenres(ctx, limit)
 	if err != nil {
 		return nil, err
@@ -605,13 +633,13 @@ func (s *NovelaService) GetMostSearched(ctx context.Context, limit int) (*dto.Mo
 	}
 
 	res := &dto.MostSearchedResponse{
-		Genres: genres,
+		Genres:     genres,
 		Categories: categories,
 	}
 
 	if s.redis != nil {
 		if data, err := json.Marshal(res); err == nil {
-			_ = s.redis.Set(ctx, cacheKey, data, 15 * time.Minute).Err()
+			_ = s.redis.Set(ctx, cacheKey, data, 15*time.Minute).Err()
 		}
 	}
 
@@ -626,15 +654,14 @@ func (s *NovelaService) UpLevelForReading(ctx context.Context, userID int) (*db.
 
 	var experience int64
 	leveledUp := false
-	
 
-	totalLevel, err := s.UserProfileRepo.GetLevelDefinition(ctx, userProfile.Level + 1)
+	totalLevel, err := s.UserProfileRepo.GetLevelDefinition(ctx, userProfile.Level+1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get level definition: %w", err)
 	}
-	
+
 	if totalLevel == nil {
-		return nil, fmt.Errorf("level definition not found for level %d", userProfile.Level + 1)
+		return nil, fmt.Errorf("level definition not found for level %d", userProfile.Level+1)
 	}
 
 	if constants.UpLevelExperienceThreshold >= userProfile.XPForNext {
@@ -657,10 +684,10 @@ func (s *NovelaService) UpLevelForReading(ctx context.Context, userID int) (*db.
 	}
 
 	return &db.UserLevel{
-		Level:         userProfile.Level,
-		LevelTitle:    userProfile.LevelTitle,
-		Experience:    experience,
-		XPForNext:     int64(totalLevel.TotalXpRequired) - experience,
+		Level:      userProfile.Level,
+		LevelTitle: userProfile.LevelTitle,
+		Experience: experience,
+		XPForNext:  int64(totalLevel.TotalXpRequired) - experience,
 	}, nil
 }
 
@@ -674,6 +701,6 @@ func (s *NovelaService) AwardUser(ctx context.Context, userID int, eventType str
 			return err
 		}
 	}
-	
+
 	return nil
 }

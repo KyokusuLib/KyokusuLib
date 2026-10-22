@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/lanxre/kyokusulib/internal/models/db"
 	"github.com/lanxre/kyokusulib/internal/models/dto"
 	service "github.com/lanxre/kyokusulib/internal/services"
+	"github.com/lanxre/kyokusulib/internal/utils/files"
 	"github.com/lanxre/kyokusulib/internal/utils/response"
 )
 
@@ -117,7 +119,22 @@ func (h *NovelaHandler) CreateNovela(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NovelaHandler) UpdateNovela(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid novela id")
+		return
+	}
+
+	if err := h.service.AuthorizeNovelaEdit(r.Context(), id, userID); err != nil {
+		h.writeUpdateError(w, id, userID, err)
+		return
+	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		response.Error(w, http.StatusBadRequest, "Payload error")
@@ -136,18 +153,28 @@ func (h *NovelaHandler) UpdateNovela(w http.ResponseWriter, r *http.Request) {
 		posterURL, _ = h.service.UploadPoster(r.Context(), file, header)
 	}
 
-	err := h.service.UpdateNovela(r.Context(), id, req, posterURL)
+	err = h.service.UpdateNovela(r.Context(), id, userID, req, posterURL)
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrNovelaNotFound):
-			response.Error(w, http.StatusNotFound, err.Error())
-		default:
-			response.Error(w, http.StatusInternalServerError, err.Error())
+		if posterURL != "" {
+			_ = files.DeleteImage(posterURL)
 		}
+		h.writeUpdateError(w, id, userID, err)
 		return
 	}
 
 	response.SuccessOkEmpty(w)
+}
+
+func (h *NovelaHandler) writeUpdateError(w http.ResponseWriter, id, userID int, err error) {
+	switch {
+	case errors.Is(err, service.ErrForbidden):
+		response.Error(w, http.StatusForbidden, "Forbidden")
+	case errors.Is(err, service.ErrNovelaNotFound):
+		response.Error(w, http.StatusNotFound, "Novela not found")
+	default:
+		log.Printf("update novela %d by user %d: %v", id, userID, err)
+		response.Error(w, http.StatusInternalServerError, "Internal server error")
+	}
 }
 
 func (h *NovelaHandler) SetBookmark(w http.ResponseWriter, r *http.Request) {
@@ -313,8 +340,8 @@ func (h *NovelaHandler) GetNovelas(w http.ResponseWriter, r *http.Request) {
 		YearTo:            toInt("year_to", 0),
 		Genres:            parseCSV("genres"),
 		Categories:        parseCSV("categories"),
-		Country: 		   parseCSV("country"),
-		AgeRating: 		   q.Get("ageRating"),	
+		Country:           parseCSV("country"),
+		AgeRating:         q.Get("ageRating"),
 		AuthorID:          toInt("author_id", 0),
 	}
 
@@ -377,7 +404,7 @@ func (h *NovelaHandler) GetBookmarkCategories(w http.ResponseWriter, r *http.Req
 		response.Error(w, http.StatusBadRequest, "Invalid user_id format")
 		return
 	}
-	
+
 	categories, err := h.service.GetBookmarkCategories(r.Context(), userIDInt)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
@@ -690,7 +717,7 @@ func (h *NovelaHandler) MarkChapterAsRead(w http.ResponseWriter, r *http.Request
 		response.Error(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка: %s", err.Error()))
 		return
 	}
-	
+
 	response.JSON(w, http.StatusOK, dataLevel)
 }
 
